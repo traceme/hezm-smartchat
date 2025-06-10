@@ -1,6 +1,6 @@
 # Task ID: 3
 # Title: Implement File Upload API with Chunking and WebSocket
-# Status: pending
+# Status: done
 # Dependencies: 1, 2
 # Priority: high
 # Description: Implement the backend API endpoint for handling file uploads. Use FastAPI to create an endpoint that supports chunked uploads, SHA-256 checksum verification, and S3 pre-signed URLs for secure uploads. Implement WebSocket for real-time progress updates.

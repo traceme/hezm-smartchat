@@ -29,5 +29,13 @@ class Settings:
     # Application
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    
+    # CORS settings
+    CORS_ORIGINS = [
+        "http://localhost:3000",  # React development server
+        "http://localhost:3001",  # Alternative React port
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001"
+    ]
 
 settings = Settings() 

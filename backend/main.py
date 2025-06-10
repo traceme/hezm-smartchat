@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from config import settings
 from database import create_tables
+from routers import upload
 
 app = FastAPI(
     title="SmartChat API",
@@ -24,6 +25,9 @@ app.add_middleware(
 async def startup_event():
     """Initialize database tables on startup."""
     create_tables()
+
+# Include routers
+app.include_router(upload.router)
 
 @app.get("/")
 async def root():

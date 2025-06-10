@@ -1,6 +1,6 @@
 # Task ID: 4
 # Title: Integrate MarkItDown for Document Conversion
-# Status: pending
+# Status: in-progress
 # Dependencies: 3
 # Priority: high
 # Description: Integrate Microsoft MarkItDown library to convert uploaded documents (PDF, EPUB, TXT, DOCX) into structured Markdown format. Implement Celery tasks for asynchronous processing of large files. Ensure that the document structure (headings, paragraphs, tables, images) is preserved during the conversion.
