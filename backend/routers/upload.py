@@ -89,13 +89,14 @@ async def upload_file(
             current_step="Upload completed"
         )
         
-        # Start background processing
-        background_tasks.add_task(process_document_background, document.id, user_id, db)
+        # Start Celery task for document processing
+        from tasks.document_tasks import process_document_task
+        task_result = process_document_task.delay(document.id, user_id)
         
         return DocumentUploadResponse(
             document_id=document.id,
             status="success",
-            message="File uploaded successfully and processing started"
+            message=f"File uploaded successfully and processing started (Task ID: {task_result.id})"
         )
         
     except HTTPException:
@@ -223,69 +224,7 @@ async def delete_file(
     
     return {"message": "File deleted successfully"}
 
-async def process_document_background(document_id: int, user_id: int, db: Session):
-    """Background task to process uploaded document."""
-    try:
-        # Get document
-        document = db.query(Document).filter(Document.id == document_id).first()
-        if not document:
-            return
-        
-        # Send processing start notification
-        await websocket_manager.send_processing_progress(
-            user_id=user_id,
-            document_id=document_id,
-            progress_type=ProgressType.PROCESSING,
-            progress_percent=10,
-            current_step="Starting document processing..."
-        )
-        
-        # Simulate processing steps (replace with actual processing)
-        processing_steps = [
-            (30, "Extracting text content..."),
-            (50, "Converting to markdown..."),
-            (70, "Creating text chunks..."),
-            (90, "Generating embeddings..."),
-            (100, "Processing completed!")
-        ]
-        
-        for progress, step in processing_steps:
-            await asyncio.sleep(1)  # Simulate processing time
-            await websocket_manager.send_processing_progress(
-                user_id=user_id,
-                document_id=document_id,
-                progress_type=ProgressType.PROCESSING,
-                progress_percent=progress,
-                current_step=step
-            )
-        
-        # Update document status
-        document.status = DocumentStatus.READY
-        db.commit()
-        
-        # Send completion notification
-        await websocket_manager.send_completion_message(
-            user_id=user_id,
-            document_id=document_id,
-            status="success",
-            message="Document processed successfully and ready for conversations"
-        )
-        
-    except Exception as e:
-        # Update document status to error
-        document = db.query(Document).filter(Document.id == document_id).first()
-        if document:
-            document.status = DocumentStatus.ERROR
-            document.processing_error = str(e)
-            db.commit()
-        
-        # Send error notification
-        await websocket_manager.send_error_message(
-            user_id=user_id,
-            document_id=document_id,
-            error_message=f"Processing failed: {str(e)}",
-            error_code="PROCESSING_ERROR"
-        )
+# Document processing is now handled by Celery tasks in tasks/document_tasks.py
 
 def get_status_description(status: DocumentStatus) -> str:
     """Get human-readable status description."""

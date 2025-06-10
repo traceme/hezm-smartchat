@@ -25,3 +25,7 @@ aiofiles==23.2.0
 
 # Testing (development)
 aiohttp==3.9.1 
+
+# Vector embeddings and text processing
+numpy>=1.24.0
+tiktoken>=0.5.0

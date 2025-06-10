@@ -171,3 +171,16 @@ This project is licensed under the MIT License.
 ## Support
 
 For support and questions, please open an issue in the repository. 
+
+
+# Start all services
+python backend/run_dev.py
+
+# Run tests
+python backend/test_document_processing.py
+python backend/test_upload.py
+
+# Start individual components
+python backend/start_celery.py        # Celery worker
+python backend/run_dev.py worker      # Worker only
+python backend/run_dev.py stop        # Stop containers

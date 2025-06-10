@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from config import settings
 from database import create_tables
-from routers import upload
+from routers import upload, search
 
 app = FastAPI(
     title="SmartChat API",
@@ -28,6 +28,7 @@ async def startup_event():
 
 # Include routers
 app.include_router(upload.router)
+app.include_router(search.router)
 
 @app.get("/")
 async def root():
