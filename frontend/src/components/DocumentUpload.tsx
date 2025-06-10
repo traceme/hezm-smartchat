@@ -37,6 +37,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import documentService from '../services/documentService';
+import { useError } from '../contexts/ErrorContext';
 
 interface UploadFile {
   id: string;
@@ -63,6 +64,9 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use error context for centralized error handling
+  const { handleApiError, handleNetworkError, showError, showSuccess, showWarning } = useError();
 
   // Supported file types and size limits
   const supportedTypes = ['application/pdf', 'application/epub+zip', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown'];
@@ -113,7 +117,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     const fileArray = Array.from(newFiles);
     
     if (files.length + fileArray.length > maxFiles) {
-      alert(`Cannot upload more than ${maxFiles} files at once`);
+      showWarning(
+        'Too many files selected',
+        `Cannot upload more than ${maxFiles} files at once. Current files: ${files.length}, selected: ${fileArray.length}`
+      );
       return;
     }
 
@@ -136,7 +143,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
     });
 
     if (errors.length > 0) {
-      alert(`Some files were rejected:\n${errors.join('\n')}`);
+      showError(
+        'Some files were rejected',
+        errors.join(', ')
+      );
     }
 
     if (validFiles.length > 0) {
@@ -257,7 +267,19 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
             : f
         ));
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Handle errors with centralized error handling
+      if (error?.isNetworkError) {
+        handleNetworkError(error);
+      } else if (error?.isApiError) {
+        handleApiError(error, `Failed to upload "${uploadFile.title}"`);
+      } else {
+        showError(
+          `Upload failed: ${uploadFile.title}`,
+          error?.message || 'An unexpected error occurred during upload'
+        );
+      }
+
       setFiles(prev => prev.map(f => 
         f.id === uploadFile.id 
           ? { 
@@ -300,6 +322,10 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
     if (completedDocumentIds.length > 0) {
       onUploadComplete?.(completedDocumentIds);
+      showSuccess(
+        `Successfully uploaded ${completedDocumentIds.length} document${completedDocumentIds.length > 1 ? 's' : ''}`,
+        'Your documents are now available for chat conversations'
+      );
     }
 
     setFiles([]);

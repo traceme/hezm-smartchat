@@ -2,6 +2,8 @@ import React from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ErrorProvider } from './contexts/ErrorContext';
 
 const theme = createTheme({
   palette: {
@@ -40,7 +42,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Layout />
+      <ErrorProvider>
+        <ErrorBoundary>
+          <Layout />
+        </ErrorBoundary>
+      </ErrorProvider>
     </ThemeProvider>
   );
 }

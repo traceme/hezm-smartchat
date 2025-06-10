@@ -1,4 +1,17 @@
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosResponse, AxiosError } from 'axios';
+
+// Extend AxiosError to include our custom context
+interface EnhancedAxiosError extends AxiosError {
+  context?: {
+    status?: number;
+    statusText?: string;
+    requestId?: string;
+    url?: string;
+    method?: string;
+    type?: string;
+    timeout?: boolean;
+  };
+}
 
 // Types for conversation management
 export interface Message {
@@ -92,6 +105,33 @@ apiClient.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for standardized error handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: EnhancedAxiosError) => {
+    // Enhance error object with additional context
+    if (error.response) {
+      // Server responded with error status
+      error.context = {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        requestId: error.response.headers?.['x-request-id'],
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+      };
+    } else if (error.request) {
+      // Request was made but no response received
+      error.context = {
+        type: 'network',
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        timeout: error.code === 'ECONNABORTED'
+      };
+    }
     return Promise.reject(error);
   }
 );
@@ -272,16 +312,37 @@ class ConversationService {
   }
 
   /**
-   * Handle API errors
+   * Handle API errors with enhanced context
    */
   private handleError(error: any): Error {
+    // Preserve original error for context while creating a standardized error
     if (axios.isAxiosError(error)) {
-      const message = error.response?.data?.detail || error.message || 'An error occurred';
-      return new Error(message);
+      // Create enhanced error object
+      const enhancedError = new Error(
+        error.response?.data?.error?.message || 
+        error.response?.data?.detail || 
+        error.message || 
+        'An error occurred'
+      );
+      
+      // Add error context for debugging
+      (enhancedError as any).response = error.response;
+      (enhancedError as any).context = (error as EnhancedAxiosError).context;
+      (enhancedError as any).isApiError = true;
+      
+      return enhancedError;
     }
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      return new Error('Network error - please check your connection');
+      const networkError = new Error('Network error - please check your connection');
+      (networkError as any).isNetworkError = true;
+      return networkError;
+    }
+    
+    if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+      const abortError = new Error('Request was cancelled');
+      (abortError as any).isAbortError = true;
+      return abortError;
     }
     
     return error instanceof Error ? error : new Error('Unknown error occurred');

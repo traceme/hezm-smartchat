@@ -1,6 +1,6 @@
 # Task ID: 11
 # Title: Implement User Authentication and Authorization
-# Status: pending
+# Status: done
 # Dependencies: 2, 8
 # Priority: medium
 # Description: Implement user authentication and authorization to secure the application. Allow users to create accounts, log in, and manage their profiles. Implement role-based access control to restrict access to certain features.

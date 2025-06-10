@@ -1,19 +1,41 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pathlib import Path
 import uvicorn
 from backend.core.config import get_settings
 from backend.core.database import create_tables
+from backend.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
+from backend.core.logging import get_app_logger
+from backend.core.exceptions import (
+    SmartChatException,
+    smartchat_exception_handler,
+    http_exception_handler,
+    validation_exception_handler,
+    general_exception_handler
+)
 from backend.routers import upload, search, dialogue, documents
 
 settings = get_settings()
+logger = get_app_logger()
 
 app = FastAPI(
     title="SmartChat API",
     description="A smart e-book conversation system API",
     version="1.0.0"
 )
+
+# Add exception handlers
+app.add_exception_handler(SmartChatException, smartchat_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
+# Add logging and error handling middleware
+app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 # Configure CORS
 app.add_middleware(
@@ -216,6 +238,7 @@ def create_database_tables():
 @app.on_event("startup")
 async def startup_event():
     """Initialize the application."""
+    logger.info("🚀 Starting SmartChat application...")
     print("🚀 Starting SmartChat application...")
     
     try:
@@ -225,17 +248,28 @@ async def startup_event():
         from sqlalchemy import inspect
         inspector = inspect(engine)
         tables = inspector.get_table_names()
+        logger.info(f"📋 Created tables: {', '.join(tables)}")
         print(f"📋 Created tables: {', '.join(tables)}")
         
         if 'documents' not in tables:
             raise Exception("Documents table not created!")
             
+        logger.info("✅ Database tables created successfully")
         print("✅ Database tables created successfully")
         
+        # Log configuration
+        logger.info(f"📊 Debug mode: {settings.debug}")
+        logger.info(f"📂 Database: {settings.database_url}")
+        logger.info(f"🔗 Qdrant: {settings.qdrant_url}")
+        logger.info(f"🤖 Embedding API: {settings.embedding_api_url}")
+        logger.info(f"📤 Upload directory: {settings.upload_dir}")
+        
     except Exception as e:
+        logger.error(f"❌ Database error: {e}")
         print(f"❌ Database error: {e}")
         raise e
     
+    logger.info("✅ Application startup complete!")
     print("✅ Application startup complete!")
 
 # Include routers

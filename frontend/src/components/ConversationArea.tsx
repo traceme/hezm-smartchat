@@ -24,6 +24,7 @@ import {
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import conversationService, { Message } from '../services/conversationService';
+import { useError } from '../contexts/ErrorContext';
 
 interface ConversationAreaProps {
   selectedDocumentId?: string | null;
@@ -43,6 +44,9 @@ const ConversationArea: React.FC<ConversationAreaProps> = ({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Use error context for centralized error handling
+  const { handleApiError, handleNetworkError, showError, showSuccess } = useError();
 
   const models = ['GPT-4o', 'Claude', 'Gemini'];
 
@@ -132,18 +136,28 @@ const ConversationArea: React.FC<ConversationAreaProps> = ({
 
       setMessages(prev => [...prev, finalMessage]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-      setError(errorMessage);
       
-      // Add error message to conversation
+      // Use centralized error handling
+      if (error?.isNetworkError) {
+        handleNetworkError(error);
+      } else if (error?.isApiError) {
+        handleApiError(error, 'Failed to send message to AI');
+      } else {
+        showError(
+          'Failed to send message',
+          error?.message || 'An unexpected error occurred while processing your request'
+        );
+      }
+      
+      // Add user-friendly error message to conversation
       const aiErrorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `I'm sorry, I encountered an error: ${errorMessage}`,
+        content: `I'm sorry, I'm having trouble processing your request right now. Please try again in a moment.`,
         isUser: false,
         timestamp: new Date(),
-        error: errorMessage,
+        error: error?.message || 'Processing error',
       };
       setMessages(prev => [...prev, aiErrorMessage]);
     } finally {
