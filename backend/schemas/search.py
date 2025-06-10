@@ -101,4 +101,38 @@ class SearchDebugInfo(BaseModel):
     vector_search_time: float = Field(..., description="Time to perform vector search")
     post_processing_time: float = Field(..., description="Time for post-processing results")
     total_time: float = Field(..., description="Total search time")
-    qdrant_response: Dict[str, Any] = Field(..., description="Raw Qdrant response metadata") 
+    qdrant_response: Dict[str, Any] = Field(..., description="Raw Qdrant response metadata")
+
+class HybridSearchQuery(BaseModel):
+    """Schema for hybrid search query requests."""
+    query: str = Field(..., description="Search query text", min_length=1, max_length=1000)
+    user_id: int = Field(..., description="ID of the user performing the search")
+    document_id: Optional[int] = Field(None, description="Optional document ID to limit search scope")
+    limit: int = Field(10, ge=1, le=50, description="Maximum number of results to return")
+    vector_weight: Optional[float] = Field(0.7, ge=0.0, le=1.0, description="Weight for vector search component")
+    keyword_weight: Optional[float] = Field(0.3, ge=0.0, le=1.0, description="Weight for keyword search component")
+    fusion_method: str = Field("weighted", regex="^(weighted|rrf|max)$", description="Fusion method: weighted, rrf, or max")
+
+class HybridSearchResult(BaseModel):
+    """Schema for hybrid search result."""
+    content: str = Field(..., description="Text content of the matching chunk")
+    document_id: int = Field(..., description="ID of the document containing this chunk")
+    document_title: str = Field(..., description="Title of the document")
+    document_type: str = Field(..., description="Type of document (pdf, txt, etc.)")
+    chunk_index: int = Field(..., description="Index of the chunk within the document")
+    chunk_type: str = Field(..., description="Type of chunk (paragraph, header, list, etc.)")
+    section_header: Optional[str] = Field(None, description="Section header if the chunk is part of a section")
+    token_count: int = Field(..., description="Number of tokens in the chunk")
+    
+    # Hybrid scoring information
+    vector_score: float = Field(..., description="Vector similarity score")
+    keyword_score: float = Field(..., description="Keyword relevance score (BM25)")
+    hybrid_score: float = Field(..., description="Combined hybrid score")
+
+class HybridSearchResponse(BaseModel):
+    """Schema for hybrid search response."""
+    query: str = Field(..., description="Original search query")
+    total_results: int = Field(..., description="Total number of results found")
+    results: List[HybridSearchResult] = Field(..., description="List of hybrid search results")
+    search_metadata: Dict[str, Any] = Field(..., description="Metadata about the search operation")
+    fusion_info: Dict[str, Any] = Field(..., description="Information about the fusion process") 

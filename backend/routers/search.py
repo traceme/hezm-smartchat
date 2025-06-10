@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from database import get_db
 from services.embedding_service import embedding_service
+from services.hybrid_search import hybrid_search_engine
 from models.document import Document
-from schemas.search import SearchQuery, SearchResult, SearchResponse
+from schemas.search import SearchQuery, SearchResult, SearchResponse, HybridSearchQuery, HybridSearchResponse
 import asyncio
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -236,27 +237,222 @@ async def find_similar_documents(
         # Format results
         similar_documents = []
         for doc in documents:
-            if doc.id in document_scores:
-                scores = document_scores[doc.id]
-                similar_documents.append({
-                    "document_id": doc.id,
-                    "title": doc.title,
-                    "document_type": doc.document_type.value,
-                    "max_similarity_score": scores["max_score"],
-                    "avg_similarity_score": scores["avg_score"],
-                    "matching_chunks": scores["chunk_count"],
-                    "word_count": doc.word_count,
-                    "created_at": doc.created_at.isoformat()
-                })
+            scores = document_scores[doc.id]
+            similar_documents.append({
+                "document_id": doc.id,
+                "title": doc.title,
+                "document_type": doc.document_type.value,
+                "max_score": scores["max_score"],
+                "avg_score": scores["avg_score"],
+                "matching_chunks": scores["chunk_count"],
+                "created_at": doc.created_at.isoformat(),
+                "word_count": doc.word_count
+            })
         
-        # Sort by max similarity score
-        similar_documents.sort(key=lambda x: x["max_similarity_score"], reverse=True)
+        # Sort by max score and limit
+        similar_documents.sort(key=lambda x: x["max_score"], reverse=True)
         
         return {
             "query": query,
-            "total_documents_found": len(similar_documents),
-            "documents": similar_documents[:limit]
+            "total_documents": len(similar_documents),
+            "documents": similar_documents[:limit],
+            "search_metadata": {
+                "user_id": user_id,
+                "score_threshold": score_threshold,
+                "chunks_analyzed": len(search_results)
+            }
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Similar documents search failed: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Similar documents search failed: {str(e)}")
+
+@router.post("/hybrid", response_model=HybridSearchResponse)
+async def hybrid_search(
+    query: HybridSearchQuery,
+    db: Session = Depends(get_db)
+):
+    """
+    Perform hybrid search combining vector similarity and keyword relevance.
+    
+    This endpoint:
+    1. Analyzes the query to optimize search strategy
+    2. Performs vector search using Qdrant
+    3. Performs keyword search using BM25
+    4. Fuses results using specified fusion method
+    5. Returns ranked results with detailed scoring
+    """
+    import time
+    start_time = time.time()
+    
+    try:
+        # Perform hybrid search
+        results = await hybrid_search_engine.hybrid_search(
+            query=query.query,
+            user_id=query.user_id,
+            document_id=query.document_id,
+            limit=query.limit,
+            vector_weight=query.vector_weight,
+            keyword_weight=query.keyword_weight,
+            fusion_method=query.fusion_method,
+            db_session=db
+        )
+        
+        total_time = time.time() - start_time
+        
+        # Convert results to response format
+        hybrid_results = []
+        for result in results:
+            hybrid_results.append(HybridSearchResult(
+                content=result.content,
+                document_id=result.document_id,
+                document_title=result.document_title,
+                document_type=result.document_type,
+                chunk_index=result.chunk_index,
+                chunk_type=result.chunk_type,
+                section_header=result.section_header,
+                token_count=result.token_count,
+                vector_score=result.vector_score,
+                keyword_score=result.keyword_score,
+                hybrid_score=result.hybrid_score
+            ))
+        
+        return HybridSearchResponse(
+            query=query.query,
+            total_results=len(results),
+            results=hybrid_results,
+            search_metadata={
+                "user_id": query.user_id,
+                "document_id": query.document_id,
+                "total_time": total_time,
+                "search_method": "hybrid"
+            },
+            fusion_info={
+                "method": query.fusion_method,
+                "vector_weight": query.vector_weight,
+                "keyword_weight": query.keyword_weight,
+                "normalized_weights": {
+                    "vector": query.vector_weight / (query.vector_weight + query.keyword_weight),
+                    "keyword": query.keyword_weight / (query.vector_weight + query.keyword_weight)
+                }
+            }
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hybrid search failed: {str(e)}")
+
+@router.get("/compare/{document_id}")
+async def compare_search_methods(
+    document_id: int,
+    query: str = Query(..., description="Search query to compare"),
+    user_id: int = Query(..., description="User ID"),
+    limit: int = Query(5, description="Number of results per method"),
+    db: Session = Depends(get_db)
+):
+    """
+    Compare different search methods side-by-side for analysis.
+    
+    Returns results from:
+    1. Pure vector search
+    2. Pure keyword search (BM25)
+    3. Hybrid search (weighted)
+    4. Hybrid search (RRF)
+    """
+    try:
+        import time
+        start_time = time.time()
+        
+        # Vector search only
+        vector_results = await embedding_service.search_similar_chunks(
+            query_text=query,
+            user_id=user_id,
+            document_id=document_id,
+            limit=limit,
+            score_threshold=0.1
+        )
+        
+        # Hybrid search - weighted
+        hybrid_weighted = await hybrid_search_engine.hybrid_search(
+            query=query,
+            user_id=user_id,
+            document_id=document_id,
+            limit=limit,
+            vector_weight=0.7,
+            keyword_weight=0.3,
+            fusion_method="weighted",
+            db_session=db
+        )
+        
+        # Hybrid search - RRF
+        hybrid_rrf = await hybrid_search_engine.hybrid_search(
+            query=query,
+            user_id=user_id,
+            document_id=document_id,
+            limit=limit,
+            vector_weight=0.5,
+            keyword_weight=0.5,
+            fusion_method="rrf",
+            db_session=db
+        )
+        
+        # Keyword search only (get chunks first)
+        chunks = await hybrid_search_engine._get_chunks_for_keyword_search(
+            user_id=user_id,
+            document_id=document_id,
+            db_session=db
+        )
+        keyword_results = hybrid_search_engine._keyword_search(query, chunks, limit)
+        
+        total_time = time.time() - start_time
+        
+        return {
+            "query": query,
+            "document_id": document_id,
+            "comparison": {
+                "vector_only": {
+                    "method": "Vector similarity (Qdrant)",
+                    "results": vector_results,
+                    "result_count": len(vector_results)
+                },
+                "keyword_only": {
+                    "method": "Keyword search (BM25)",
+                    "results": keyword_results,
+                    "result_count": len(keyword_results)
+                },
+                "hybrid_weighted": {
+                    "method": "Hybrid weighted (70% vector, 30% keyword)",
+                    "results": [
+                        {
+                            "content": r.content,
+                            "document_id": r.document_id,
+                            "chunk_index": r.chunk_index,
+                            "vector_score": r.vector_score,
+                            "keyword_score": r.keyword_score,
+                            "hybrid_score": r.hybrid_score
+                        } for r in hybrid_weighted
+                    ],
+                    "result_count": len(hybrid_weighted)
+                },
+                "hybrid_rrf": {
+                    "method": "Hybrid RRF (Reciprocal Rank Fusion)",
+                    "results": [
+                        {
+                            "content": r.content,
+                            "document_id": r.document_id,
+                            "chunk_index": r.chunk_index,
+                            "vector_score": r.vector_score,
+                            "keyword_score": r.keyword_score,
+                            "hybrid_score": r.hybrid_score
+                        } for r in hybrid_rrf
+                    ],
+                    "result_count": len(hybrid_rrf)
+                }
+            },
+            "metadata": {
+                "total_time": total_time,
+                "query_length": len(query),
+                "query_words": len(query.split())
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search comparison failed: {str(e)}")
