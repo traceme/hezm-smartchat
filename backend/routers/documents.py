@@ -14,6 +14,9 @@ from backend.schemas.document import (
     DocumentUpdateRequest,
     DocumentMetadata
 )
+from backend.services.document_cache import document_cache
+from backend.services.search_cache import search_cache
+from backend.services.conversation_cache import get_conversation_cache
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
 
@@ -34,102 +37,85 @@ async def list_documents(
     limit: int = Query(100, ge=1, le=1000, description="Number of documents to return")
 ):
     """
-    Get list of documents for the current user with filtering, searching, and sorting.
+    Get list of documents for the current user with filtering, searching, and sorting (cached).
     """
-    query = db.query(Document).filter(
-        Document.owner_id == user_id,
-        Document.status != DocumentStatus.DELETED
-    )
-
-    # Apply search filter
-    if search:
-        search_filter = or_(
-            Document.title.ilike(f"%{search}%"),
-            Document.original_filename.ilike(f"%{search}%")
-        )
-        query = query.filter(search_filter)
-
-    # Apply status filter
-    if status:
-        try:
-            status_enum = DocumentStatus(status.lower())
-            query = query.filter(Document.status == status_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-
-    # Apply document type filter
-    if document_type:
-        try:
-            type_enum = DocumentType(document_type.lower())
-            query = query.filter(Document.document_type == type_enum)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid document type: {document_type}")
-
-    # Apply sorting
-    valid_sort_fields = {
-        'title': Document.title,
-        'created_at': Document.created_at,
-        'updated_at': Document.updated_at,
-        'file_size': Document.file_size,
-        'status': Document.status
-    }
-    
+    # Validate sort field first (before caching attempt)
+    valid_sort_fields = ['title', 'created_at', 'updated_at', 'file_size', 'status']
     if sort_by not in valid_sort_fields:
         raise HTTPException(status_code=400, detail=f"Invalid sort field: {sort_by}")
     
-    sort_field = valid_sort_fields[sort_by]
-    if sort_order.lower() == 'desc':
-        query = query.order_by(desc(sort_field))
-    else:
-        query = query.order_by(asc(sort_field))
+    # Validate status and document_type
+    if status:
+        try:
+            DocumentStatus(status.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-    # Get total count before pagination
-    total_count = query.count()
-
-    # Apply pagination
-    documents = query.offset(skip).limit(limit).all()
-
-    # Convert to response format
-    document_list = []
-    for doc in documents:
-        # Format file size
-        size_mb = doc.file_size / (1024 * 1024)
-        if size_mb < 1:
-            size_str = f"{doc.file_size / 1024:.1f} KB"
-        else:
-            size_str = f"{size_mb:.1f} MB"
-
-        # Calculate processing progress for processing documents
-        processing_progress = None
-        if doc.status == DocumentStatus.PROCESSING:
-            # Simple progress estimation - could be enhanced with actual progress tracking
-            processing_progress = 65
-
-        document_list.append(DocumentResponse(
-            id=doc.id,
-            title=doc.title,
-            original_filename=doc.original_filename,
-            document_type=doc.document_type.value,
-            status=doc.status.value,
-            file_size=doc.file_size,
-            file_size_display=size_str,
-            page_count=doc.page_count,
-            word_count=doc.word_count,
-            language=doc.language,
-            processing_progress=processing_progress,
-            processing_error=doc.processing_error,
-            created_at=doc.created_at,
-            updated_at=doc.updated_at,
-            processed_at=doc.processed_at
-        ))
-
-    return DocumentListResponse(
-        documents=document_list,
-        total_count=total_count,
+    if document_type:
+        try:
+            DocumentType(document_type.lower())
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid document type: {document_type}")
+    
+    # Try to get from cache first
+    cache_result = await document_cache.get_document_list(
+        db=db,
+        user_id=user_id,
+        search=search,
+        status=status,
+        document_type=document_type,
+        category=category,
+        sort_by=sort_by,
+        sort_order=sort_order,
         skip=skip,
-        limit=limit,
-        has_more=total_count > (skip + len(document_list))
+        limit=limit
     )
+    
+    if cache_result:
+        # Convert cached documents to response format
+        document_list = []
+        for doc_data in cache_result['documents']:
+            # Format file size
+            size_mb = doc_data['file_size'] / (1024 * 1024)
+            if size_mb < 1:
+                size_str = f"{doc_data['file_size'] / 1024:.1f} KB"
+            else:
+                size_str = f"{size_mb:.1f} MB"
+
+            # Calculate processing progress for processing documents
+            processing_progress = None
+            if doc_data['status'] == DocumentStatus.PROCESSING.value:
+                processing_progress = 65
+
+            document_list.append(DocumentResponse(
+                id=doc_data['id'],
+                title=doc_data['title'],
+                original_filename=doc_data['original_filename'],
+                document_type=doc_data['document_type'],
+                status=doc_data['status'],
+                file_size=doc_data['file_size'],
+                file_size_display=size_str,
+                page_count=doc_data['page_count'],
+                word_count=doc_data['word_count'],
+                language=doc_data['language'],
+                processing_progress=processing_progress,
+                processing_error=doc_data['processing_error'],
+                created_at=doc_data['created_at'],
+                updated_at=doc_data['updated_at'],
+                processed_at=doc_data['processed_at']
+            ))
+
+        return DocumentListResponse(
+            documents=document_list,
+            total_count=cache_result['total_count'],
+            skip=cache_result['skip'],
+            limit=cache_result['limit'],
+            has_more=cache_result['has_more']
+        )
+    
+    # Fallback to original implementation if cache fails
+    # This should not happen as the cache service handles fallbacks internally
+    raise HTTPException(status_code=500, detail="Document retrieval failed")
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
@@ -138,45 +124,42 @@ async def get_document(
     user_id: int = CURRENT_USER_ID
 ):
     """
-    Get a specific document by ID.
+    Get a specific document by ID with caching.
     """
-    document = db.query(Document).filter(
-        Document.id == document_id,
-        Document.owner_id == user_id,
-        Document.status != DocumentStatus.DELETED
-    ).first()
-
-    if not document:
+    # Try to get from cache first
+    doc_data = await document_cache.get_document_metadata(document_id, db, user_id)
+    
+    if not doc_data:
         raise HTTPException(status_code=404, detail="Document not found")
 
     # Format file size
-    size_mb = document.file_size / (1024 * 1024)
+    size_mb = doc_data['file_size'] / (1024 * 1024)
     if size_mb < 1:
-        size_str = f"{document.file_size / 1024:.1f} KB"
+        size_str = f"{doc_data['file_size'] / 1024:.1f} KB"
     else:
         size_str = f"{size_mb:.1f} MB"
 
     # Calculate processing progress for processing documents
     processing_progress = None
-    if document.status == DocumentStatus.PROCESSING:
+    if doc_data['status'] == DocumentStatus.PROCESSING.value:
         processing_progress = 65
 
     return DocumentResponse(
-        id=document.id,
-        title=document.title,
-        original_filename=document.original_filename,
-        document_type=document.document_type.value,
-        status=document.status.value,
-        file_size=document.file_size,
+        id=doc_data['id'],
+        title=doc_data['title'],
+        original_filename=doc_data['original_filename'],
+        document_type=doc_data['document_type'],
+        status=doc_data['status'],
+        file_size=doc_data['file_size'],
         file_size_display=size_str,
-        page_count=document.page_count,
-        word_count=document.word_count,
-        language=document.language,
+        page_count=doc_data['page_count'],
+        word_count=doc_data['word_count'],
+        language=doc_data['language'],
         processing_progress=processing_progress,
-        processing_error=document.processing_error,
-        created_at=document.created_at,
-        updated_at=document.updated_at,
-        processed_at=document.processed_at
+        processing_error=doc_data['processing_error'],
+        created_at=doc_data['created_at'],
+        updated_at=doc_data['updated_at'],
+        processed_at=doc_data['processed_at']
     )
 
 @router.put("/{document_id}", response_model=DocumentResponse)
@@ -208,6 +191,14 @@ async def update_document(
 
     db.commit()
     db.refresh(document)
+
+    # Invalidate caches for this document and user
+    await document_cache.invalidate_document_cache(document_id)
+    await document_cache.invalidate_user_list_cache(user_id)
+    
+    # Invalidate conversation caches for this document
+    conversation_cache = get_conversation_cache()
+    await conversation_cache.invalidate_conversation_caches(document_id=document_id)
 
     # Format file size
     size_mb = document.file_size / (1024 * 1024)
@@ -266,11 +257,31 @@ async def delete_document(
         # TODO: Also remove file from storage and vector embeddings
         db.delete(document)
         db.commit()
+        
+        # Invalidate caches
+        await document_cache.invalidate_document_cache(document_id)
+        await document_cache.invalidate_user_list_cache(user_id)
+        await search_cache.invalidate_document_search_cache(document_id)
+        
+        # Invalidate conversation caches for this document
+        conversation_cache = get_conversation_cache()
+        await conversation_cache.invalidate_conversation_caches(document_id=document_id)
+        
         return {"message": "Document permanently deleted", "document_id": document_id}
     else:
         # Soft delete - set status to DELETED
         document.status = DocumentStatus.DELETED
         db.commit()
+        
+        # Invalidate caches
+        await document_cache.invalidate_document_cache(document_id)
+        await document_cache.invalidate_user_list_cache(user_id)
+        await search_cache.invalidate_document_search_cache(document_id)
+        
+        # Invalidate conversation caches for this document
+        conversation_cache = get_conversation_cache()
+        await conversation_cache.invalidate_conversation_caches(document_id=document_id)
+        
         return {"message": "Document deleted", "document_id": document_id}
 
 @router.post("/bulk-delete")
@@ -315,6 +326,15 @@ async def bulk_delete_documents(
         deleted_count += 1
 
     db.commit()
+
+    # Invalidate caches for all affected documents and user lists
+    conversation_cache = get_conversation_cache()
+    for doc_id in found_ids:
+        await document_cache.invalidate_document_cache(doc_id)
+        await search_cache.invalidate_document_search_cache(doc_id)
+        # Invalidate conversation caches for each document
+        await conversation_cache.invalidate_conversation_caches(document_id=doc_id)
+    await document_cache.invalidate_user_list_cache(user_id)
 
     response_data = {
         "message": f"Successfully deleted {deleted_count} documents",

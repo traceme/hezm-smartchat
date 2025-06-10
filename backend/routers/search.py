@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from backend.core.database import get_db
+from backend.services.search_cache import search_cache
 from services.embedding_service import embedding_service
 from services.hybrid_search import hybrid_search_engine
 from models.document import Document
@@ -16,15 +17,53 @@ async def semantic_search(
     db: Session = Depends(get_db)
 ):
     """
-    Perform semantic search across user's documents using vector similarity.
+    Perform semantic search across user's documents using vector similarity with caching.
     
     This endpoint:
-    1. Generates embedding for the search query
-    2. Searches for similar chunks in Qdrant
-    3. Returns ranked results with similarity scores
+    1. Checks Redis cache for existing results
+    2. Generates embedding for the search query if cache miss
+    3. Searches for similar chunks in Qdrant
+    4. Caches and returns ranked results with similarity scores
     """
     try:
-        # Perform vector similarity search
+        # Try to get results from cache first
+        cached_response = await search_cache.get_semantic_search_results(
+            query=query.query,
+            user_id=query.user_id,
+            document_id=query.document_id,
+            limit=query.limit,
+            score_threshold=query.score_threshold
+        )
+        
+        if cached_response:
+            # Convert cached results back to SearchResult objects
+            formatted_results = []
+            for result_data in cached_response['results']:
+                search_result = SearchResult(
+                    content=result_data["content"],
+                    score=result_data["score"],
+                    document_id=result_data["document_id"],
+                    document_title=result_data["document_title"],
+                    document_type=result_data["document_type"],
+                    chunk_index=result_data["chunk_index"],
+                    chunk_type=result_data.get("chunk_type", "paragraph"),
+                    section_header=result_data.get("section_header"),
+                    token_count=result_data["token_count"]
+                )
+                formatted_results.append(search_result)
+            
+            return SearchResponse(
+                query=cached_response['query'],
+                total_results=cached_response['total_results'],
+                results=formatted_results,
+                search_metadata={
+                    **cached_response['metadata'],
+                    "cache_hit": True,
+                    "cached_at": cached_response.get('cached_at')
+                }
+            )
+        
+        # Cache miss - perform actual search
         search_results = await embedding_service.search_similar_chunks(
             query_text=query.query,
             user_id=query.user_id,
@@ -40,9 +79,12 @@ async def semantic_search(
         
         # Format results
         formatted_results = []
+        raw_results_for_cache = []
+        
         for result in search_results:
             doc = doc_map.get(result["document_id"])
             if doc:
+                # Create SearchResult for response
                 search_result = SearchResult(
                     content=result["content"],
                     score=result["score"],
@@ -55,16 +97,43 @@ async def semantic_search(
                     token_count=result["token_count"]
                 )
                 formatted_results.append(search_result)
+                
+                # Create dict for caching (Pydantic objects aren't JSON serializable)
+                raw_results_for_cache.append({
+                    "content": result["content"],
+                    "score": result["score"],
+                    "document_id": result["document_id"],
+                    "document_title": doc.title,
+                    "document_type": doc.document_type.value,
+                    "chunk_index": result["chunk_index"],
+                    "chunk_type": result.get("chunk_type", "paragraph"),
+                    "section_header": result.get("section_header"),
+                    "token_count": result["token_count"]
+                })
+        
+        # Cache the results for future requests
+        search_metadata = {
+            "embedding_model": embedding_service.embedding_model,
+            "score_threshold": query.score_threshold,
+            "documents_searched": len(document_ids) if not query.document_id else 1,
+            "cache_hit": False
+        }
+        
+        await search_cache.cache_semantic_search_results(
+            query=query.query,
+            results=raw_results_for_cache,
+            user_id=query.user_id,
+            document_id=query.document_id,
+            limit=query.limit,
+            score_threshold=query.score_threshold,
+            metadata=search_metadata
+        )
         
         return SearchResponse(
             query=query.query,
             total_results=len(formatted_results),
             results=formatted_results,
-            search_metadata={
-                "embedding_model": embedding_service.embedding_model,
-                "score_threshold": query.score_threshold,
-                "documents_searched": len(document_ids) if not query.document_id else 1
-            }
+            search_metadata=search_metadata
         )
         
     except Exception as e:
@@ -78,11 +147,23 @@ async def get_document_chunks(
     db: Session = Depends(get_db)
 ):
     """
-    Get chunks for a specific document with pagination.
+    Get chunks for a specific document with pagination (cached).
     Useful for browsing document content and debugging.
     """
     try:
-        # Verify document exists and user has access
+        # Try to get from cache first
+        cached_chunks = await search_cache.get_document_chunks(
+            document_id=document_id,
+            skip=skip,
+            limit=limit
+        )
+        
+        if cached_chunks:
+            # Add cache hit indicator to response
+            cached_chunks["cache_hit"] = True
+            return cached_chunks
+        
+        # Cache miss - verify document exists and user has access
         document = db.query(Document).filter(Document.id == document_id).first()
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -96,7 +177,7 @@ async def get_document_chunks(
         # Apply pagination
         chunks = chunks_info["chunks"][skip:skip + limit]
         
-        return {
+        response_data = {
             "document_id": document_id,
             "document_title": document.title,
             "total_chunks": chunks_info["total_chunks"],
@@ -105,8 +186,19 @@ async def get_document_chunks(
                 "skip": skip,
                 "limit": limit,
                 "has_more": skip + limit < chunks_info["total_chunks"]
-            }
+            },
+            "cache_hit": False
         }
+        
+        # Cache the results
+        await search_cache.cache_document_chunks(
+            document_id=document_id,
+            chunks_data=response_data,
+            skip=skip,
+            limit=limit
+        )
+        
+        return response_data
         
     except HTTPException:
         raise

@@ -2,10 +2,12 @@ from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import json
 import logging
 
 from backend.services.dialogue_service import dialogue_service
+from backend.services.conversation_cache import get_conversation_cache
 from backend.schemas.dialogue import (
     QueryRequest, 
     QueryResponse, 
@@ -30,6 +32,23 @@ async def process_query(request: QueryRequest):
     4. Returns response with citations
     """
     try:
+        conversation_cache = get_conversation_cache()
+        
+        # Try to get cached result first
+        cached_result = await conversation_cache.get_query_result(
+            query=request.query,
+            user_id=request.user_id,
+            document_id=request.document_id,
+            model_preference=request.model_preference,
+            conversation_history=request.conversation_history
+        )
+        
+        if cached_result:
+            logger.debug(f"Returning cached query result for: {request.query[:50]}...")
+            # Add cache hit indicator in response headers would be done at app level
+            return cached_result
+        
+        # Process query if not cached
         result = await dialogue_service.process_query(
             query=request.query,
             user_id=request.user_id,
@@ -38,7 +57,19 @@ async def process_query(request: QueryRequest):
             model_preference=request.model_preference
         )
         
-        return QueryResponse(**result)
+        query_response = QueryResponse(**result)
+        
+        # Cache the result for future use
+        await conversation_cache.cache_query_result(
+            query=request.query,
+            result=query_response,
+            user_id=request.user_id,
+            document_id=request.document_id,
+            model_preference=request.model_preference,
+            conversation_history=request.conversation_history
+        )
+        
+        return query_response
         
     except Exception as e:
         logger.error(f"Error processing query: {str(e)}")
@@ -167,6 +198,17 @@ async def health_check():
         if any("unhealthy" in status for status in health_status["services"].values()):
             health_status["status"] = "degraded"
         
+        # Test conversation cache
+        try:
+            conversation_cache = get_conversation_cache()
+            cache_stats = await conversation_cache.get_cache_stats()
+            if "error" in cache_stats:
+                health_status["services"]["conversation_cache"] = f"unhealthy: {cache_stats['error']}"
+            else:
+                health_status["services"]["conversation_cache"] = f"healthy ({cache_stats.get('total_conversation_cache_size', 0)} entries)"
+        except Exception as e:
+            health_status["services"]["conversation_cache"] = f"unhealthy: {str(e)}"
+        
         return health_status
         
     except Exception as e:
@@ -199,8 +241,66 @@ async def get_dialogue_stats():
         except Exception as e:
             stats["vector_database"] = {"error": str(e)}
         
+        # Get conversation cache stats
+        try:
+            conversation_cache = get_conversation_cache()
+            cache_stats = await conversation_cache.get_cache_stats()
+            stats["conversation_cache"] = cache_stats
+        except Exception as e:
+            stats["conversation_cache"] = {"error": str(e)}
+        
         return stats
         
     except Exception as e:
         logger.error(f"Error getting dialogue stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cache/stats")
+async def get_conversation_cache_stats():
+    """Get detailed conversation cache statistics."""
+    try:
+        conversation_cache = get_conversation_cache()
+        stats = await conversation_cache.get_cache_stats()
+        
+        return {
+            "cache_stats": stats,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation cache stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cache/clear")
+async def clear_conversation_cache(
+    conversation_id: Optional[str] = Query(None, description="Clear specific conversation"),
+    user_id: Optional[int] = Query(None, description="Clear caches for specific user"),
+    document_id: Optional[int] = Query(None, description="Clear caches for specific document"),
+    all: bool = Query(False, description="Clear all conversation caches")
+):
+    """Clear conversation caches based on specified criteria."""
+    try:
+        conversation_cache = get_conversation_cache()
+        
+        if all:
+            # Clear all conversation caches
+            deleted_count = await conversation_cache.invalidate_conversation_caches()
+        else:
+            # Clear based on specific criteria
+            deleted_count = await conversation_cache.invalidate_conversation_caches(
+                conversation_id=conversation_id,
+                user_id=user_id,
+                document_id=document_id
+            )
+        
+        return {
+            "message": f"Successfully cleared {deleted_count} cache entries",
+            "deleted_count": deleted_count,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error clearing conversation cache: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

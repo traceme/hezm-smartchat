@@ -9,6 +9,7 @@ from backend.core.config import get_settings
 from backend.core.database import create_tables
 from backend.core.middleware import RequestLoggingMiddleware, ErrorHandlingMiddleware
 from backend.core.logging import get_app_logger
+from backend.core.redis import init_redis, close_redis, get_redis_client
 from backend.core.exceptions import (
     SmartChatException,
     smartchat_exception_handler,
@@ -242,6 +243,7 @@ async def startup_event():
     print("🚀 Starting SmartChat application...")
     
     try:
+        # Initialize database
         engine = create_database_tables()
         
         # Verify tables exist
@@ -257,20 +259,52 @@ async def startup_event():
         logger.info("✅ Database tables created successfully")
         print("✅ Database tables created successfully")
         
+        # Initialize Redis
+        redis_client = await init_redis()
+        if redis_client and redis_client._is_connected:
+            health = await redis_client.health_check()
+            logger.info(f"🗄️  Redis connected: {health['status']} (v{health.get('version', 'unknown')})")
+            print(f"🗄️  Redis connected: {health['status']} (v{health.get('version', 'unknown')})")
+        else:
+            logger.warning("⚠️  Redis connection failed - caching disabled")
+            print("⚠️  Redis connection failed - caching disabled")
+        
         # Log configuration
         logger.info(f"📊 Debug mode: {settings.debug}")
         logger.info(f"📂 Database: {settings.database_url}")
+        logger.info(f"🗄️  Redis: {settings.redis_url}")
         logger.info(f"🔗 Qdrant: {settings.qdrant_url}")
         logger.info(f"🤖 Embedding API: {settings.embedding_api_url}")
         logger.info(f"📤 Upload directory: {settings.upload_dir}")
         
     except Exception as e:
-        logger.error(f"❌ Database error: {e}")
-        print(f"❌ Database error: {e}")
+        logger.error(f"❌ Startup error: {e}")
+        print(f"❌ Startup error: {e}")
         raise e
     
     logger.info("✅ Application startup complete!")
     print("✅ Application startup complete!")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up resources on shutdown."""
+    logger.info("🛑 Shutting down SmartChat application...")
+    print("🛑 Shutting down SmartChat application...")
+    
+    try:
+        # Close Redis connection
+        await close_redis()
+        logger.info("🗄️  Redis connection closed")
+        print("🗄️  Redis connection closed")
+        
+    except Exception as e:
+        logger.error(f"❌ Shutdown error: {e}")
+        print(f"❌ Shutdown error: {e}")
+    
+    logger.info("✅ Application shutdown complete!")
+    print("✅ Application shutdown complete!")
+
 
 # Include routers
 app.include_router(upload.router)
@@ -278,13 +312,50 @@ app.include_router(search.router)
 app.include_router(dialogue.router)
 app.include_router(documents.router)
 
+# Import and include cache management router
+from backend.routers import cache
+app.include_router(cache.router)
+
 @app.get("/")
 async def root():
     return {"message": "SmartChat API is running"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "smartchat-api"}
+    """Comprehensive health check including Redis status."""
+    health_status = {
+        "status": "healthy",
+        "service": "smartchat-api",
+        "version": "1.0.0",
+        "components": {
+            "database": "healthy",
+            "redis": "unknown"
+        }
+    }
+    
+    # Check Redis health
+    try:
+        redis_client = get_redis_client()
+        if redis_client:
+            redis_health = await redis_client.health_check()
+            health_status["components"]["redis"] = redis_health["status"]
+            if redis_health["status"] == "healthy":
+                health_status["components"]["redis_info"] = {
+                    "memory_used": redis_health.get("memory_used"),
+                    "connections": redis_health.get("connections"),
+                    "version": redis_health.get("version")
+                }
+        else:
+            health_status["components"]["redis"] = "not_configured"
+    except Exception as e:
+        health_status["components"]["redis"] = "unhealthy"
+        health_status["components"]["redis_error"] = str(e)
+    
+    # Overall status
+    if health_status["components"]["redis"] == "unhealthy":
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 

@@ -8,6 +8,9 @@ import os
 from backend.core.database import get_db
 from backend.services.file_service import file_service
 from backend.services.websocket_service import websocket_manager, ProgressType
+from backend.services.document_cache import document_cache
+from backend.services.search_cache import search_cache
+from backend.services.conversation_cache import get_conversation_cache
 from backend.schemas.document import DocumentUploadResponse, DocumentProcessingStatus
 from backend.models.document import Document, DocumentStatus
 
@@ -81,6 +84,14 @@ async def upload_file(
         if title:
             document.title = title
             db.commit()
+        
+        # Invalidate user's document list cache since a new document was added
+        await document_cache.invalidate_user_list_cache(user_id)
+        # Invalidate user's search cache since document collection changed
+        await search_cache.invalidate_user_search_cache(user_id)
+        # Invalidate conversation caches since document collection changed
+        conversation_cache = get_conversation_cache()
+        await conversation_cache.invalidate_conversation_caches(user_id=user_id)
         
         # Send upload completion
         await websocket_manager.send_upload_progress(
