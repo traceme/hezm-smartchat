@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   AppBar,
@@ -11,6 +11,7 @@ import {
 import DocumentList from './DocumentList';
 import ConversationArea from './ConversationArea';
 import DocumentUpload from './DocumentUpload';
+import documentService, { Document } from '../services/documentService';
 
 const DRAWER_WIDTH = 320;
 
@@ -23,13 +24,34 @@ const Layout: React.FC<LayoutProps> = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
   // State management
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>('1');
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [refreshDocuments, setRefreshDocuments] = useState(0);
 
+  // Load selected document details when ID changes
+  const loadSelectedDocument = useCallback(async (documentId: string | null) => {
+    if (!documentId) {
+      setSelectedDocument(null);
+      return;
+    }
+
+    try {
+      const document = await documentService.getDocument(documentId);
+      setSelectedDocument(document);
+    } catch (error) {
+      console.error('Error loading selected document:', error);
+      setSelectedDocument(null);
+    }
+  }, []);
+
+  // Effect to load document when selection changes
+  useEffect(() => {
+    loadSelectedDocument(selectedDocumentId);
+  }, [selectedDocumentId, loadSelectedDocument]);
+
   const handleDocumentSelect = (documentId: string | null) => {
     setSelectedDocumentId(documentId);
-    // TODO: Load document content when selected
   };
 
   const handleDocumentUpload = () => {
@@ -111,7 +133,10 @@ const Layout: React.FC<LayoutProps> = () => {
           overflow: 'hidden',
         }}
       >
-        <ConversationArea selectedDocumentId={selectedDocumentId} />
+        <ConversationArea 
+          selectedDocumentId={selectedDocumentId} 
+          selectedDocumentTitle={selectedDocument?.title}
+        />
       </Box>
 
       {/* Document Upload Dialog */}
