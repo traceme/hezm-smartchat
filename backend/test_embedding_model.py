@@ -2,8 +2,8 @@ import requests
 import json
 
 # 获取文本嵌入
-def get_embedding(text, model="qwen3-embedding-8b"):
-    url = "http://10.2.0.16:8000/v1/embeddings"
+def get_embedding(text, model="Qwen3-Embedding-8B"):
+    url = "http://10.2.0.16:8085/v1/embeddings"
     
     headers = {
         "Content-Type": "application/json",

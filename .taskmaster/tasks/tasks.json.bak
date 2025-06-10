@@ -87,62 +87,8 @@
       "dependencies": [
         6
       ],
-      "status": "done",
-      "subtasks": [
-        {
-          "id": 1,
-          "title": "Implement Vector Search Integration and Fragment Retrieval",
-          "description": "Integrate the vector search functionality with the existing services to retrieve the top-30 relevant fragments based on the user query. This includes setting up the connection to the vector database and implementing the query logic.",
-          "dependencies": [],
-          "details": "Configure vector database connection, implement query logic, retrieve top-30 fragments.\n<info added on 2025-06-10T08:30:10.477Z>\n## Implementation Details:\n\n1. **DialogueService Core Class**: Created `backend/services/dialogue_service.py` with:\n   - Vector search integration using existing VectorService\n   - Fragment retrieval with configurable limits (top_k_initial=30, top_k_final=10)\n   - Similarity threshold filtering (0.3)\n   - Context generation with citation tracking\n   - Prompt preparation for LLM integration\n\n2. **LLM Service Integration**: Created `backend/services/llm_service.py` with:\n   - Multi-provider support (OpenAI GPT-4o, Claude 3.5 Sonnet, Gemini 2.0 Flash)\n   - Streaming response support\n   - Fallback mechanism between providers\n   - Proper error handling and timeouts\n\n3. **FastAPI Endpoints**: Created `backend/routers/dialogue.py` with:\n   - `/api/dialogue/query` - Standard query processing\n   - `/api/dialogue/query/stream` - Streaming responses\n   - `/api/dialogue/models` - Available models status\n   - `/api/dialogue/health` - Service health check\n   - `/api/dialogue/stats` - Service statistics\n\n4. **Pydantic Schemas**: Created `backend/schemas/dialogue.py` with:\n   - QueryRequest/Response models\n   - StreamQueryRequest for streaming\n   - Citation model for source tracking\n   - ConversationMessage for history\n\n5. **Testing**: Created comprehensive test script `backend/test_dialogue_engine.py` for:\n   - Vector search functionality\n   - Context generation \n   - Prompt preparation\n   - LLM provider availability\n   - Full query processing\n   - Streaming functionality\n   - Performance benchmarking\n\n6. **Main App Integration**: Updated `backend/main.py` to include dialogue router\n\n## Key Features Achieved:\n- ✅ Vector search integration working\n- ✅ Multi-LLM support with fallback\n- ✅ Citation system implemented\n- ✅ Streaming responses\n- ✅ FastAPI endpoints ready\n- ✅ Comprehensive testing suite\n- ✅ Health monitoring endpoints\n\nThe vector search integration is fully functional and ready for production use. All LLM providers can be configured via API keys, with automatic fallback if primary provider fails.\n</info added on 2025-06-10T08:30:10.477Z>",
-          "status": "done",
-          "testStrategy": "Verify that the correct fragments are retrieved for various test queries. Measure retrieval time."
-        },
-        {
-          "id": 2,
-          "title": "Implement BGE Re-ranking of Retrieved Fragments",
-          "description": "Implement the bge-reranker-base model to re-rank the fragments retrieved from the vector search. This involves loading the model and applying it to the retrieved fragments to improve the relevance of the results.",
-          "dependencies": [
-            1
-          ],
-          "details": "Load bge-reranker-base model, implement re-ranking logic, integrate with vector search results.",
-          "status": "done",
-          "testStrategy": "Compare the ranking of fragments before and after re-ranking. Ensure that more relevant fragments are ranked higher."
-        },
-        {
-          "id": 3,
-          "title": "Integrate Multiple LLMs (OpenAI, Claude, Gemini) for Answer Generation",
-          "description": "Integrate the OpenAI GPT-4o, Claude, and Gemini LLMs to generate answers based on the re-ranked fragments. Implement a mechanism to select the appropriate LLM based on configuration or user preference.",
-          "dependencies": [
-            2
-          ],
-          "details": "Implement API calls to OpenAI, Claude, and Gemini. Implement LLM selection logic.",
-          "status": "done",
-          "testStrategy": "Test answer generation with each LLM. Compare the quality and relevance of the generated answers."
-        },
-        {
-          "id": 4,
-          "title": "Implement Answer Citation and Streaming Response Generation",
-          "description": "Implement a system for citing the source fragments used to generate the answer. Implement streaming response generation to provide a more interactive user experience.",
-          "dependencies": [
-            3
-          ],
-          "details": "Implement citation logic, implement streaming response using server-sent events or websockets.",
-          "status": "done",
-          "testStrategy": "Verify that citations are correctly generated and linked to the source fragments. Test streaming response for different network conditions."
-        },
-        {
-          "id": 5,
-          "title": "Create FastAPI Endpoints for Dialogue API",
-          "description": "Create FastAPI endpoints for the dialogue API to allow users to interact with the dialogue engine. This includes defining the API endpoints, request/response models, and integrating with the core dialogue engine logic.",
-          "dependencies": [
-            4
-          ],
-          "details": "Define API endpoints, implement request/response models, integrate with dialogue engine.",
-          "status": "done",
-          "testStrategy": "Test API endpoints with various requests. Verify that the API returns the correct responses and handles errors gracefully."
-        }
-      ]
+      "status": "in-progress",
+      "subtasks": []
     },
     {
       "id": 8,
