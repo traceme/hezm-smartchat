@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
     
     # Database settings
-    database_url: str = Field(default="postgresql://smartchat:smartchat@localhost:5432/smartchat", description="Database URL")
+    database_url: str = Field(default="sqlite:///./smartchat.db", description="Database URL")
     database_echo: bool = Field(default=False, description="Echo SQL queries")
     
     # Redis settings

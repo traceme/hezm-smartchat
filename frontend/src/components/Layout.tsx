@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   AppBar,
@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import DocumentList from './DocumentList';
 import ConversationArea from './ConversationArea';
+import DocumentUpload from './DocumentUpload';
 
 const DRAWER_WIDTH = 320;
 
@@ -20,6 +21,34 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // State management
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>('1');
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [refreshDocuments, setRefreshDocuments] = useState(0);
+
+  const handleDocumentSelect = (documentId: string | null) => {
+    setSelectedDocumentId(documentId);
+    // TODO: Load document content when selected
+  };
+
+  const handleDocumentUpload = () => {
+    setUploadDialogOpen(true);
+  };
+
+  const handleUploadDialogClose = () => {
+    setUploadDialogOpen(false);
+  };
+
+  const handleUploadComplete = (documentIds: number[]) => {
+    console.log('Upload completed for documents:', documentIds);
+    // Trigger refresh of document list
+    setRefreshDocuments(prev => prev + 1);
+    // Optionally select the first uploaded document
+    if (documentIds.length > 0) {
+      setSelectedDocumentId(documentIds[0].toString());
+    }
+  };
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
@@ -62,7 +91,12 @@ const Layout: React.FC<LayoutProps> = () => {
           },
         }}
       >
-        <DocumentList />
+        <DocumentList 
+          selectedDocumentId={selectedDocumentId}
+          onDocumentSelect={handleDocumentSelect}
+          onDocumentUpload={handleDocumentUpload}
+          key={refreshDocuments} // Force refresh when documents are uploaded
+        />
       </Drawer>
 
       {/* Main Content Area */}
@@ -77,8 +111,15 @@ const Layout: React.FC<LayoutProps> = () => {
           overflow: 'hidden',
         }}
       >
-        <ConversationArea />
+        <ConversationArea selectedDocumentId={selectedDocumentId} />
       </Box>
+
+      {/* Document Upload Dialog */}
+      <DocumentUpload
+        open={uploadDialogOpen}
+        onClose={handleUploadDialogClose}
+        onUploadComplete={handleUploadComplete}
+      />
     </Box>
   );
 };

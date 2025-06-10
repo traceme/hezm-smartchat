@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from celery_app import celery_app
 from config import settings
 from services.document_processor import document_processor
-from database import SessionLocal
+from backend.core.database import SessionLocal
 
 class DatabaseTask(Task):
     """Base task class that provides database session management."""

@@ -5,13 +5,16 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 import hashlib
-
-from markitdown import MarkItDown
+import logging
+import tempfile
+import aiofiles
 from sqlalchemy.orm import Session
 
-from models.document import Document, DocumentChunk, DocumentStatus, DocumentType
+from markitdown import MarkItDown
 from services.websocket_service import websocket_manager, ProgressType
 from config import settings
+
+from backend.models.document import Document, DocumentChunk, DocumentStatus, DocumentType
 
 class DocumentProcessor:
     def __init__(self):

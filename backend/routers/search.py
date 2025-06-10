@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from database import get_db
+from backend.core.database import get_db
 from services.embedding_service import embedding_service
 from services.hybrid_search import hybrid_search_engine
 from models.document import Document

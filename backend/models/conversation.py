@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum as SQLEnum, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from database import Base
+from backend.core.database import Base
 import enum
 
 class MessageRole(enum.Enum):
@@ -16,6 +16,7 @@ class AIModel(enum.Enum):
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False, index=True)
@@ -25,7 +26,7 @@ class Conversation(Base):
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
     
     # Conversation settings
-    ai_model = Column(Enum(AIModel), default=AIModel.GPT4O, nullable=False)
+    ai_model = Column(SQLEnum(AIModel), default=AIModel.GPT4O, nullable=False)
     system_prompt = Column(Text, nullable=True)
     
     # Metadata
@@ -37,22 +38,18 @@ class Conversation(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     last_message_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationships
-    user = relationship("User", back_populates="conversations")
-    document = relationship("Document", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
-
     def __repr__(self):
         return f"<Conversation(id={self.id}, title='{self.title}', model='{self.ai_model.value}')>"
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
     
     # Message content
-    role = Column(Enum(MessageRole), nullable=False)
+    role = Column(SQLEnum(MessageRole), nullable=False)
     content = Column(Text, nullable=False)
     
     # AI response metadata
@@ -71,9 +68,6 @@ class Message(Base):
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    conversation = relationship("Conversation", back_populates="messages")
 
     def __repr__(self):
         return f"<Message(id={self.id}, role='{self.role.value}', conversation_id={self.conversation_id})>" 

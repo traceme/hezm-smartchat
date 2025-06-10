@@ -1,25 +1,26 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum, BigInteger
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum, BigInteger, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from database import Base
+from backend.core.database import Base
 import enum
 
 class DocumentStatus(enum.Enum):
-    UPLOADING = "uploading"
-    PROCESSING = "processing"
-    READY = "ready"
-    ERROR = "error"
-    DELETED = "deleted"
+    UPLOADING = "UPLOADING"
+    PROCESSING = "PROCESSING"
+    READY = "READY"
+    ERROR = "ERROR"
+    DELETED = "DELETED"
 
 class DocumentType(enum.Enum):
-    PDF = "pdf"
-    EPUB = "epub"
-    TXT = "txt"
-    DOCX = "docx"
-    MD = "md"
+    PDF = "PDF"
+    EPUB = "EPUB"
+    TXT = "TXT"
+    DOCX = "DOCX"
+    MD = "MD"
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False, index=True)
@@ -48,17 +49,13 @@ class Document(Base):
     # Foreign keys
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
-    # Relationships
-    owner = relationship("User", back_populates="documents")
-    document_chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
-    conversations = relationship("Conversation", back_populates="document", cascade="all, delete-orphan")
-
     def __repr__(self):
         return f"<Document(id={self.id}, title='{self.title}', status='{self.status.value}')>"
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
-
+    __table_args__ = {'extend_existing': True}
+    
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
     chunk_index = Column(Integer, nullable=False)  # Order of chunk in document
@@ -76,9 +73,6 @@ class DocumentChunk(Base):
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    document = relationship("Document", back_populates="document_chunks")
 
     def __repr__(self):
         return f"<DocumentChunk(id={self.id}, document_id={self.document_id}, chunk_index={self.chunk_index})>" 

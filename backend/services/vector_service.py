@@ -24,7 +24,7 @@ class VectorService:
         self.settings = get_settings()
         
         # Initialize Qdrant client
-        self.qdrant_client = QdrantClient(url=self.settings.qdrant_url)
+        self.qdrant_client = QdrantClient(url=self.settings.qdrant_url, check_compatibility=False)
         
         # Initialize embedding service
         self.embedding_service = EmbeddingService()

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
-from models.document import DocumentStatus, DocumentType
+from backend.models.document import DocumentStatus, DocumentType
 
 # Base document schema
 class DocumentBase(BaseModel):
@@ -15,6 +15,10 @@ class DocumentCreate(DocumentBase):
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     status: Optional[DocumentStatus] = None
+
+# Schema for document update request
+class DocumentUpdateRequest(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
 
 # Schema for document response
 class Document(DocumentBase):
@@ -36,6 +40,41 @@ class Document(DocumentBase):
 
     class Config:
         from_attributes = True
+
+# Enhanced document response schema for API
+class DocumentResponse(BaseModel):
+    id: int
+    title: str
+    original_filename: str
+    document_type: str
+    status: str
+    file_size: int
+    file_size_display: str
+    page_count: Optional[int] = None
+    word_count: Optional[int] = None
+    language: Optional[str] = None
+    processing_progress: Optional[int] = None
+    processing_error: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    processed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Schema for document list response
+class DocumentListResponse(BaseModel):
+    documents: List[DocumentResponse]
+    total_count: int
+    skip: int
+    limit: int
+    has_more: bool
+
+# Schema for document metadata
+class DocumentMetadata(BaseModel):
+    page_count: Optional[int] = None
+    word_count: Optional[int] = None
+    language: Optional[str] = None
 
 # Schema for document list view (lighter version)
 class DocumentSummary(BaseModel):

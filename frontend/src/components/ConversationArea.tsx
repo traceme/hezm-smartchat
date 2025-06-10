@@ -30,7 +30,7 @@ interface Message {
 }
 
 interface ConversationAreaProps {
-  selectedDocument?: string;
+  selectedDocumentId?: string | null;
 }
 
 // Mock conversation data
@@ -57,7 +57,7 @@ const mockMessages: Message[] = [
   },
 ];
 
-const ConversationArea: React.FC<ConversationAreaProps> = ({ selectedDocument }) => {
+const ConversationArea: React.FC<ConversationAreaProps> = ({ selectedDocumentId }) => {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -115,7 +115,7 @@ const ConversationArea: React.FC<ConversationAreaProps> = ({ selectedDocument })
     setAnchorEl(null);
   };
 
-  if (!selectedDocument) {
+  if (!selectedDocumentId) {
     return (
       <Box
         sx={{

@@ -111,7 +111,7 @@ class HybridSearchQuery(BaseModel):
     limit: int = Field(10, ge=1, le=50, description="Maximum number of results to return")
     vector_weight: Optional[float] = Field(0.7, ge=0.0, le=1.0, description="Weight for vector search component")
     keyword_weight: Optional[float] = Field(0.3, ge=0.0, le=1.0, description="Weight for keyword search component")
-    fusion_method: str = Field("weighted", regex="^(weighted|rrf|max)$", description="Fusion method: weighted, rrf, or max")
+    fusion_method: str = Field("weighted", pattern="^(weighted|rrf|max)$", description="Fusion method: weighted, rrf, or max")
 
 class HybridSearchResult(BaseModel):
     """Schema for hybrid search result."""

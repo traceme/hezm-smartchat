@@ -1,6 +1,6 @@
 from celery import current_app as celery_app
 from sqlalchemy.orm import Session
-from database import get_db
+from backend.core.database import get_db
 from models.document import Document, DocumentChunk
 from services.text_splitter import semantic_splitter
 from services.embedding_service import embedding_service

@@ -3,12 +3,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import asyncio
+import os
 
-from database import get_db
-from services.file_service import file_service
-from services.websocket_service import websocket_manager, ProgressType
-from schemas.document import DocumentUploadResponse, DocumentProcessingStatus
-from models.document import Document, DocumentStatus
+from backend.core.database import get_db
+from backend.services.file_service import file_service
+from backend.services.websocket_service import websocket_manager, ProgressType
+from backend.schemas.document import DocumentUploadResponse, DocumentProcessingStatus
+from backend.models.document import Document, DocumentStatus
 
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
 

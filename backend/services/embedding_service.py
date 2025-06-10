@@ -71,4 +71,8 @@ class EmbeddingService:
             try:
                 asyncio.create_task(self.client.aclose())
             except Exception:
-                pass  # Ignore cleanup errors 
+                pass  # Ignore cleanup errors
+
+
+# Create a singleton instance - THIS IS THE MISSING LINE!
+embedding_service = EmbeddingService()

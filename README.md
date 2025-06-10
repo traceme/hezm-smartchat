@@ -184,3 +184,11 @@ python backend/test_upload.py
 python backend/start_celery.py        # Celery worker
 python backend/run_dev.py worker      # Worker only
 python backend/run_dev.py stop        # Stop containers
+
+
+# Test the library path
+export DYLD_LIBRARY_PATH="/usr/local/Homebrew/Cellar/libmagic/5.46/lib:$DYLD_LIBRARY_PATH"
+export MAGIC="/usr/local/Homebrew/Cellar/libmagic/5.46/share/misc/magic.mgc"
+
+# Test if magic works now
+uv run python -c "import magic; print('Magic works!'); print(magic.from_file('/etc/hosts'))"

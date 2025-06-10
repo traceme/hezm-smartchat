@@ -6,10 +6,14 @@ from collections import defaultdict, Counter
 from dataclasses import dataclass
 import numpy as np
 from sqlalchemy.orm import Session
+from sqlalchemy import text, and_, or_
+import logging
+from datetime import datetime
+import json
 
+from backend.models.document import Document, DocumentChunk
 from services.embedding_service import embedding_service
 from services.text_splitter import TextChunk
-from models.document import Document, DocumentChunk
 
 @dataclass
 class SearchResult:
