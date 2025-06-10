@@ -1,0 +1,14 @@
+# Task ID: 7
+# Title: Implement Dialogue Engine with LLM Integration
+# Status: pending
+# Dependencies: 6
+# Priority: high
+# Description: Implement the core dialogue engine using vector search to retrieve the top-30 relevant fragments, then use bge-reranker-base to re-rank the fragments. Integrate multiple LLMs (OpenAI GPT-4o, Claude, Gemini) to generate answers. Implement answer citation and streaming response generation.
+# Details:
+1. Implement vector search to retrieve top-30 relevant fragments.
+2. Use bge-reranker-base to re-rank the fragments.
+3. Integrate multiple LLMs (OpenAI GPT-4o, Claude, Gemini).
+4. Implement answer citation and streaming response generation.
+
+# Test Strategy:
+Test the dialogue engine with various queries and verify that it generates accurate and relevant answers. Verify that the answer citation and streaming response generation are working correctly.

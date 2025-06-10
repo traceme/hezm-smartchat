@@ -1,0 +1,14 @@
+# Task ID: 6
+# Title: Implement Hybrid Search Strategy
+# Status: pending
+# Dependencies: 5
+# Priority: medium
+# Description: Implement a hybrid search strategy that combines vector search and inverted index search to retrieve relevant document fragments. Optimize the search strategy for accuracy and performance.
+# Details:
+1. Implement vector search using Qdrant.
+2. Implement inverted index search.
+3. Combine vector search and inverted index search for hybrid search.
+4. Optimize search strategy for accuracy and performance.
+
+# Test Strategy:
+Test the hybrid search strategy with various queries and verify that it retrieves relevant document fragments. Measure the accuracy and performance of the search strategy.

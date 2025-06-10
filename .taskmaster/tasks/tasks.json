@@ -1,0 +1,304 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Initialize Project and Configure Environment",
+      "description": "Initialize the project repository with FastAPI, React, and TypeScript. Configure basic project structure, including folders for backend, frontend, and common utilities. Set up initial configurations for linting, formatting, and version control. Project structure includes comprehensive backend, frontend, infrastructure, and documentation setup.",
+      "status": "done",
+      "dependencies": [],
+      "priority": "high",
+      "details": "1. Created a new repository.\n2. Initialized backend with FastAPI, including main.py, config.py, and structured directories (models/, routers/, services/).\n3. Initialized frontend with React and TypeScript using Material-UI v6.\n4. Configured ESLint, Prettier, and Git.\n5. Set up Docker and Docker Compose for containerized deployment with PostgreSQL, Redis, and Qdrant services.\n6. Created comprehensive README.md with setup instructions, project structure documentation, development workflow guidelines, and environment variable documentation.",
+      "testStrategy": "Verify that the project structure is correctly set up and that the initial configurations for linting, formatting, and version control are working as expected. Confirm that the Docker and Docker Compose configurations are functional and that all services (PostgreSQL, Redis, Qdrant) are running correctly. Ensure the frontend and backend applications are accessible and communicating as expected. Verify documentation accuracy.",
+      "subtasks": []
+    },
+    {
+      "id": 2,
+      "title": "Design Database Schema and Define SQLAlchemy Models",
+      "description": "Design the PostgreSQL database schema for storing metadata related to uploaded documents, including file names, upload dates, format, and processing status. Define SQLAlchemy models to interact with the database.",
+      "details": "1. Design PostgreSQL schema with tables for documents and users.\n2. Define SQLAlchemy models representing the database tables.\n3. Implement database connection and migration scripts.",
+      "testStrategy": "Create and apply database migrations. Verify that the database schema is correctly created and that SQLAlchemy models can interact with the database.",
+      "priority": "high",
+      "dependencies": [
+        1
+      ],
+      "status": "done",
+      "subtasks": []
+    },
+    {
+      "id": 3,
+      "title": "Implement File Upload API with Chunking and WebSocket",
+      "description": "Implement the backend API endpoint for handling file uploads. Use FastAPI to create an endpoint that supports chunked uploads, SHA-256 checksum verification, and S3 pre-signed URLs for secure uploads. Implement WebSocket for real-time progress updates.",
+      "details": "1. Implement FastAPI endpoint for file uploads.\n2. Implement chunked upload logic with 5MB chunks.\n3. Implement SHA-256 checksum verification to prevent duplicate uploads.\n4. Integrate S3 pre-signed URLs for secure uploads.\n5. Implement WebSocket for real-time progress updates.",
+      "testStrategy": "Upload large files in chunks and verify that they are correctly assembled on the server. Verify that SHA-256 checksum verification prevents duplicate uploads. Verify that WebSocket updates are sent correctly during the upload process.",
+      "priority": "high",
+      "dependencies": [
+        1,
+        2
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 4,
+      "title": "Integrate MarkItDown for Document Conversion",
+      "description": "Integrate Microsoft MarkItDown library to convert uploaded documents (PDF, EPUB, TXT, DOCX) into structured Markdown format. Implement Celery tasks for asynchronous processing of large files. Ensure that the document structure (headings, paragraphs, tables, images) is preserved during the conversion.",
+      "details": "1. Integrate Microsoft MarkItDown library.\n2. Implement Celery tasks for asynchronous document conversion.\n3. Ensure document structure is preserved during conversion.\n4. Implement error handling and retry mechanisms.",
+      "testStrategy": "Upload documents in various formats and verify that they are correctly converted to Markdown format. Verify that the document structure is preserved during the conversion. Verify that Celery tasks are executed asynchronously.",
+      "priority": "high",
+      "dependencies": [
+        3
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 5,
+      "title": "Implement Text Splitting and Vectorize Content",
+      "description": "Implement text splitting logic to divide the converted Markdown content into semantic chunks of 1-2k tokens. Use Qwen3-Embedding-8B to generate vector embeddings for each chunk. Store the embeddings in Qdrant vector database.",
+      "details": "1. Implement text splitting logic to divide Markdown content into 1-2k token chunks.\n2. Use Qwen3-Embedding-8B to generate vector embeddings.\n3. Store embeddings in Qdrant vector database.",
+      "testStrategy": "Verify that the text splitting logic correctly divides the Markdown content into semantic chunks. Verify that Qwen3-Embedding-8B generates vector embeddings for each chunk. Verify that the embeddings are stored correctly in Qdrant.",
+      "priority": "high",
+      "dependencies": [
+        4
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 6,
+      "title": "Implement Hybrid Search Strategy",
+      "description": "Implement a hybrid search strategy that combines vector search and inverted index search to retrieve relevant document fragments. Optimize the search strategy for accuracy and performance.",
+      "details": "1. Implement vector search using Qdrant.\n2. Implement inverted index search.\n3. Combine vector search and inverted index search for hybrid search.\n4. Optimize search strategy for accuracy and performance.",
+      "testStrategy": "Test the hybrid search strategy with various queries and verify that it retrieves relevant document fragments. Measure the accuracy and performance of the search strategy.",
+      "priority": "medium",
+      "dependencies": [
+        5
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 7,
+      "title": "Implement Dialogue Engine with LLM Integration",
+      "description": "Implement the core dialogue engine using vector search to retrieve the top-30 relevant fragments, then use bge-reranker-base to re-rank the fragments. Integrate multiple LLMs (OpenAI GPT-4o, Claude, Gemini) to generate answers. Implement answer citation and streaming response generation.",
+      "details": "1. Implement vector search to retrieve top-30 relevant fragments.\n2. Use bge-reranker-base to re-rank the fragments.\n3. Integrate multiple LLMs (OpenAI GPT-4o, Claude, Gemini).\n4. Implement answer citation and streaming response generation.",
+      "testStrategy": "Test the dialogue engine with various queries and verify that it generates accurate and relevant answers. Verify that the answer citation and streaming response generation are working correctly.",
+      "priority": "high",
+      "dependencies": [
+        6
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 8,
+      "title": "Develop User Interface with React and Material-UI",
+      "description": "Developed the user interface using React, TypeScript, and Material-UI v6. Implemented a Gmail-style layout with a document list on the left and a conversation area on the right. The UI is responsive and supports mobile devices with a minimum width of 360px. The UI is fully functional with mock data and ready for backend integration.",
+      "status": "done",
+      "dependencies": [],
+      "priority": "high",
+      "details": "Developed user interface using React, TypeScript, and Material-UI v6, implementing a Gmail-style layout with document list and conversation area. The UI is responsive, supports mobile devices, and is ready for backend integration. Key components include Layout.tsx, DocumentList.tsx, and ConversationArea.tsx. Features include document search, AI model selection, and message source citations.",
+      "testStrategy": "The user interface has been tested on various devices and screen sizes. The layout is correct and the UI is responsive. The UI supports mobile devices with a minimum width of 360px. Further testing will focus on integration with the backend and ensuring data consistency.",
+      "subtasks": [
+        {
+          "id": 8.1,
+          "title": "Develop Layout.tsx: Main app layout with Gmail-style design, responsive drawer for documents, and main content area",
+          "status": "completed"
+        },
+        {
+          "id": 8.2,
+          "title": "Develop DocumentList.tsx: Sidebar document list with search functionality, document status indicators, and upload FAB",
+          "status": "completed"
+        },
+        {
+          "id": 8.3,
+          "title": "Develop ConversationArea.tsx: Chat interface with message history, AI model selection, source citations, and input area",
+          "status": "completed"
+        },
+        {
+          "id": 8.4,
+          "title": "Implement Gmail-style left sidebar with document list",
+          "status": "completed"
+        },
+        {
+          "id": 8.5,
+          "title": "Implement responsive design supporting mobile devices (≥360px)",
+          "status": "completed"
+        },
+        {
+          "id": 8.6,
+          "title": "Implement Material-UI v6 components with custom Google-style theming",
+          "status": "completed"
+        },
+        {
+          "id": 8.7,
+          "title": "Implement document search and filtering",
+          "status": "completed"
+        },
+        {
+          "id": 8.8,
+          "title": "Implement real-time conversation interface with mock data",
+          "status": "completed"
+        },
+        {
+          "id": 8.9,
+          "title": "Implement AI model selection dropdown (GPT-4o, Claude, Gemini)",
+          "status": "completed"
+        },
+        {
+          "id": 8.1,
+          "title": "Implement message source citations and formatting",
+          "status": "completed"
+        },
+        {
+          "id": 8.11,
+          "title": "Implement Markdown rendering for AI responses",
+          "status": "completed"
+        },
+        {
+          "id": 8.12,
+          "title": "Implement mobile-responsive drawer that adapts to screen size",
+          "status": "completed"
+        },
+        {
+          "id": 8.13,
+          "title": "Implement custom useResponsive hook for breakpoint detection",
+          "status": "completed"
+        },
+        {
+          "id": 8.14,
+          "title": "Implement mobile-first approach with collapsible sidebar",
+          "status": "completed"
+        },
+        {
+          "id": 8.15,
+          "title": "Ensure proper spacing and layout for different screen sizes",
+          "status": "completed"
+        },
+        {
+          "id": 8.16,
+          "title": "Implement touch-friendly interfaces for mobile devices",
+          "status": "completed"
+        },
+        {
+          "id": 8.17,
+          "title": "Implement Google Material Design 3 inspired theme",
+          "status": "completed"
+        },
+        {
+          "id": 8.18,
+          "title": "Implement custom color palette matching Gmail aesthetics",
+          "status": "completed"
+        },
+        {
+          "id": 8.19,
+          "title": "Ensure consistent spacing and typography",
+          "status": "completed"
+        },
+        {
+          "id": 8.2,
+          "title": "Implement smooth transitions and hover effects",
+          "status": "completed"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Implement Document List Component",
+      "description": "Implement the document list component to display uploaded documents. Allow users to browse, search, categorize, and delete documents. Integrate with the backend API to fetch and manage documents.",
+      "details": "1. Implement document list component using React and Material-UI.\n2. Allow users to browse, search, categorize, and delete documents.\n3. Integrate with backend API to fetch and manage documents.",
+      "testStrategy": "Verify that the document list component displays uploaded documents correctly. Verify that users can browse, search, categorize, and delete documents. Verify that the component integrates correctly with the backend API.",
+      "priority": "medium",
+      "dependencies": [
+        2,
+        8
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 10,
+      "title": "Implement Conversation Area Component",
+      "description": "Implement the conversation area component to display the conversation history and allow users to input questions. Integrate with the dialogue engine to generate answers and display them in the conversation area. Support Markdown rendering for displaying formatted text.",
+      "details": "1. Implement conversation area component using React and Material-UI.\n2. Display conversation history and allow users to input questions.\n3. Integrate with dialogue engine to generate answers.\n4. Support Markdown rendering for displaying formatted text.",
+      "testStrategy": "Verify that the conversation area component displays the conversation history correctly. Verify that users can input questions and receive answers. Verify that the component integrates correctly with the dialogue engine. Verify that Markdown rendering is working correctly.",
+      "priority": "medium",
+      "dependencies": [
+        7,
+        8
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 11,
+      "title": "Implement User Authentication and Authorization",
+      "description": "Implement user authentication and authorization to secure the application. Allow users to create accounts, log in, and manage their profiles. Implement role-based access control to restrict access to certain features.",
+      "details": "1. Implement user authentication and authorization using a secure framework (e.g., JWT).\n2. Allow users to create accounts, log in, and manage their profiles.\n3. Implement role-based access control.",
+      "testStrategy": "Verify that users can create accounts, log in, and manage their profiles. Verify that role-based access control is working correctly.",
+      "priority": "medium",
+      "dependencies": [
+        2,
+        8
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 12,
+      "title": "Implement Caching with Redis",
+      "description": "Implement caching using Redis to improve performance and reduce latency. Cache frequently accessed data, such as document metadata and search results.",
+      "details": "1. Implement caching using Redis.\n2. Cache frequently accessed data, such as document metadata and search results.\n3. Configure cache expiration policies.",
+      "testStrategy": "Verify that caching is working correctly by measuring the response time for frequently accessed data. Verify that the cache expiration policies are working correctly.",
+      "priority": "low",
+      "dependencies": [
+        2,
+        5,
+        6
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 13,
+      "title": "Implement Error Handling and Logging",
+      "description": "Implement error handling and logging throughout the application. Log errors and exceptions to a file or database for debugging and monitoring purposes. Implement a user-friendly error page to display errors to the user.",
+      "details": "1. Implement error handling and logging throughout the application.\n2. Log errors and exceptions to a file or database.\n3. Implement a user-friendly error page.",
+      "testStrategy": "Verify that errors and exceptions are logged correctly. Verify that the user-friendly error page is displayed correctly.",
+      "priority": "low",
+      "dependencies": [],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 14,
+      "title": "Conduct End-to-End Testing",
+      "description": "Conduct end-to-end testing to verify that all features of the application are working correctly. Test the application with various inputs and scenarios to ensure that it meets the requirements.",
+      "details": "1. Conduct end-to-end testing to verify that all features are working correctly.\n2. Test the application with various inputs and scenarios.\n3. Ensure that the application meets the requirements.",
+      "testStrategy": "Create a comprehensive test plan that covers all features of the application. Execute the test plan and verify that all tests pass.",
+      "priority": "high",
+      "dependencies": [
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "status": "pending",
+      "subtasks": []
+    },
+    {
+      "id": 15,
+      "title": "Deploy Application and Configure Monitoring",
+      "description": "Deploy the application to a production environment. Configure monitoring and alerting to ensure that the application is running smoothly and that any issues are detected and resolved quickly.",
+      "details": "1. Deploy the application to a production environment.\n2. Configure monitoring and alerting.\n3. Ensure that the application is running smoothly.",
+      "testStrategy": "Verify that the application is deployed correctly and that it is running smoothly. Verify that monitoring and alerting are working correctly.",
+      "priority": "high",
+      "dependencies": [
+        14
+      ],
+      "status": "pending",
+      "subtasks": []
+    }
+  ]
+}

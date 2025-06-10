@@ -1,0 +1,13 @@
+# Task ID: 5
+# Title: Implement Text Splitting and Vectorize Content
+# Status: pending
+# Dependencies: 4
+# Priority: high
+# Description: Implement text splitting logic to divide the converted Markdown content into semantic chunks of 1-2k tokens. Use Qwen3-Embedding-8B to generate vector embeddings for each chunk. Store the embeddings in Qdrant vector database.
+# Details:
+1. Implement text splitting logic to divide Markdown content into 1-2k token chunks.
+2. Use Qwen3-Embedding-8B to generate vector embeddings.
+3. Store embeddings in Qdrant vector database.
+
+# Test Strategy:
+Verify that the text splitting logic correctly divides the Markdown content into semantic chunks. Verify that Qwen3-Embedding-8B generates vector embeddings for each chunk. Verify that the embeddings are stored correctly in Qdrant.

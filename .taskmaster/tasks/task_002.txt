@@ -1,0 +1,13 @@
+# Task ID: 2
+# Title: Design Database Schema and Define SQLAlchemy Models
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Design the PostgreSQL database schema for storing metadata related to uploaded documents, including file names, upload dates, format, and processing status. Define SQLAlchemy models to interact with the database.
+# Details:
+1. Design PostgreSQL schema with tables for documents and users.
+2. Define SQLAlchemy models representing the database tables.
+3. Implement database connection and migration scripts.
+
+# Test Strategy:
+Create and apply database migrations. Verify that the database schema is correctly created and that SQLAlchemy models can interact with the database.
