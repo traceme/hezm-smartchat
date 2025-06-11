@@ -1,0 +1,72 @@
+# SmartChat AWS Infrastructure Configuration Example
+# Copy this file to terraform.tfvars and update the values
+
+# Basic Configuration
+project_name = "smartchat"
+environment  = "production"
+aws_region   = "us-east-1"
+domain_name  = "smartchat.yourdomain.com"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = [
+  "10.0.1.0/24",
+  "10.0.2.0/24"
+]
+private_subnet_cidrs = [
+  "10.0.3.0/24",
+  "10.0.4.0/24"
+]
+
+# EC2 Configuration
+instance_type    = "t3.medium"       # For production, consider t3.large or c5.large
+key_pair_name    = "smartchat-key"   # Create this key pair in AWS first
+ssh_cidr_block   = "0.0.0.0/0"      # Restrict this to your IP for security
+
+# Auto Scaling Configuration
+asg_min_size         = 2
+asg_max_size         = 10
+asg_desired_capacity = 3
+
+# Database Configuration
+db_instance_class           = "db.t3.micro"  # For production, consider db.t3.small or larger
+db_allocated_storage        = 20             # GB
+db_max_allocated_storage    = 100            # GB
+db_name                     = "smartchat"
+db_username                 = "smartchat_user"
+db_password                 = "your-secure-database-password-here"
+db_backup_retention_period  = 7              # days
+
+# Redis Configuration
+redis_node_type        = "cache.t3.micro"    # For production, consider cache.t3.small or larger
+redis_num_cache_nodes  = 2                   # For HA
+redis_auth_token       = "your-secure-redis-auth-token-here"
+
+# Example for different environments:
+
+# Development Environment
+# instance_type = "t3.small"
+# asg_min_size = 1
+# asg_max_size = 3
+# asg_desired_capacity = 1
+# db_instance_class = "db.t3.micro"
+# redis_node_type = "cache.t3.micro"
+# redis_num_cache_nodes = 1
+
+# Staging Environment
+# instance_type = "t3.medium"
+# asg_min_size = 1
+# asg_max_size = 5
+# asg_desired_capacity = 2
+# db_instance_class = "db.t3.small"
+# redis_node_type = "cache.t3.small"
+# redis_num_cache_nodes = 2
+
+# Production Environment (recommended)
+# instance_type = "t3.large"
+# asg_min_size = 3
+# asg_max_size = 15
+# asg_desired_capacity = 5
+# db_instance_class = "db.t3.medium"
+# redis_node_type = "cache.t3.medium"
+# redis_num_cache_nodes = 3 

@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smartchat
+  labels:
+    name: smartchat
+    environment: production
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smartchat-secrets
+  namespace: smartchat
+type: Opaque
+stringData:
+  database-url: "postgresql://smartchat_user:your_password@postgres-service:5432/smartchat"
+  redis-url: "redis://:your_redis_password@redis-service:6379"
+  secret-key: "your-jwt-secret-key-here"
+  openai-api-key: "your-openai-api-key"
+  anthropic-api-key: "your-anthropic-api-key"
+  google-api-key: "your-google-api-key"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smartchat-config
+  namespace: smartchat
+data:
+  APP_NAME: "SmartChat"
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  WORKERS: "4"
+  MAX_FILE_SIZE: "104857600"
+  UPLOAD_CHUNK_SIZE: "5242880"
+  STORAGE_TYPE: "local" 

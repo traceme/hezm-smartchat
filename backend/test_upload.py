@@ -16,7 +16,7 @@ async def test_websocket_connection():
     
     try:
         session = aiohttp.ClientSession()
-        ws = await session.ws_connect('ws://localhost:8000/api/upload/ws?user_id=1')
+        ws = await session.ws_connect('ws://localhost:8006/api/upload/ws?user_id=1')
         
         # Send test message
         await ws.send_str(json.dumps({"message": "test connection"}))

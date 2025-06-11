@@ -6,18 +6,27 @@ import os
 import sys
 
 # Add the backend directory to the Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
-from config import settings
-from database import Base
-import models  # Import all models
+# Add the project root to path for imports
+project_root = os.path.dirname(backend_dir)
+sys.path.insert(0, project_root)
+
+from backend.core.config import get_settings
+from backend.core.database import Base
+# Import all models to ensure they're registered with Base.metadata
+from backend.models.user import User
+from backend.models.document import Document, DocumentChunk
+from backend.models.conversation import Conversation, Message
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set the SQLAlchemy URL from our settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Get settings and set the SQLAlchemy URL
+settings = get_settings()
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

@@ -91,4 +91,12 @@ alembic/versions/*.pyc
 # Temporary files
 *.tmp
 *.temp
-.cache/ 
+.cache/
+
+# Security
+/infrastructure/security/.vault/
+/infrastructure/security/config/certbot/
+secrets.yml
+*.pem
+*.key
+*.csr 

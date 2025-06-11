@@ -1,6 +1,6 @@
 import os
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
     
     # Database settings
-    database_url: str = Field(default="sqlite:///./smartchat.db", description="Database URL")
+    database_url: str = Field(default="sqlite:///Users/hzmhezhiming/projects/opensource-projects/hezm-smartchat/backend/smartchat_debug.db", description="Database URL")
     database_echo: bool = Field(default=False, description="Echo SQL queries")
     
     # Redis settings
@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
     google_api_key: Optional[str] = Field(default=None, description="Google API key")
+    
+    # JWT Settings
+    SECRET_KEY: str = "a-very-secret-key-that-should-be-in-env"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_KEY_EXPIRATION_DAYS: int = 90
+    
+    # Security
+    ALLOWED_HOSTS: List[str] = ["*"]
     
     class Config:
         env_file = ".env"

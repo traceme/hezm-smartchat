@@ -1,0 +1,16 @@
+SmartChat Test Document
+
+This is a test document for verifying the document upload and processing functionality.
+
+Content includes:
+- Text processing capabilities
+- File upload verification  
+- Conversion testing
+- Embedding generation testing
+
+Date: 2025-06-10
+Test ID: E2E-001
+
+The quick brown fox jumps over the lazy dog. This sentence is used for testing text processing and contains all letters of the alphabet.
+
+End of test document. 

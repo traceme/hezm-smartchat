@@ -1,0 +1,124 @@
+version: '3.8'
+
+networks:
+  smartchat-dev:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smartchat-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: smartchat_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - smartchat-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartchat_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartchat-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - smartchat-dev
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: smartchat-qdrant-dev
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_dev_data:/qdrant/storage
+    networks:
+      - smartchat-dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: smartchat-backend-dev
+    restart: unless-stopped
+    ports:
+      - "8006:8000"  # Use 8006 for development to avoid conflicts
+    environment:
+      DATABASE_URL: postgresql://postgres:devpassword@postgres:5432/smartchat_dev
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      DEBUG: "true"
+      LOG_LEVEL: debug
+      CORS_ORIGINS: "http://localhost:3001,http://localhost:3000"
+      RELOAD: "true"
+    volumes:
+      - ./backend:/app
+      - upload_dev_data:/app/uploads
+      - logs_dev_data:/app/logs
+      - /app/__pycache__  # Prevent pycache conflicts
+    networks:
+      - smartchat-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: smartchat-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # Use 3001 for development
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"  # For file watching in Docker
+      REACT_APP_API_URL: http://localhost:8006
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - smartchat-dev
+    depends_on:
+      - backend
+    command: npm start
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  qdrant_dev_data:
+    driver: local
+  upload_dev_data:
+    driver: local
+  logs_dev_data:
+    driver: local 

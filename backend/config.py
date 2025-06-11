@@ -5,7 +5,7 @@ load_dotenv()
 
 class Settings:
     # Database
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localhost:5432/smartchat")
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///Users/hzmhezhiming/projects/opensource-projects/hezm-smartchat/backend/smartchat_debug.db")
     
     # Redis
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
