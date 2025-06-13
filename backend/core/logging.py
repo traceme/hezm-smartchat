@@ -20,6 +20,9 @@ class SmartChatLogger:
         self.api_logger = self._setup_logger("smartchat.api", "api.log")
         self.error_logger = self._setup_logger("smartchat.error", "error.log", level=logging.ERROR)
         self.debug_logger = self._setup_logger("smartchat.debug", "debug.log", level=logging.DEBUG)
+        
+        # Setup a logger for the entire 'backend' module to capture all internal logs
+        self.backend_logger = self._setup_logger("backend", "backend.log", level=logging.DEBUG)
     
     def _setup_logger(self, name: str, filename: str, level: int = logging.INFO) -> logging.Logger:
         """Setup a logger with file rotation and console output"""

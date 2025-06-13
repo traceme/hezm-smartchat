@@ -73,15 +73,27 @@ class EmbeddingService:
                     headers=headers,
                     json=data
                 )
-                response.raise_for_status()
+                response.raise_for_status() # This will raise an exception for 4xx/5xx responses
                 
                 result = response.json()
                 return result['data'][0]['embedding']
                 
-            except httpx.HTTPError as e:
-                raise Exception(f"Embedding API error: {str(e)}")
+            except httpx.HTTPStatusError as e:
+                # Log detailed HTTP error information
+                print(f"Embedding API HTTP error: Status {e.response.status_code}, Response: {e.response.text}")
+                raise Exception(f"Embedding API HTTP error: {str(e)}")
+            except httpx.RequestError as e:
+                # Log network/request errors
+                print(f"Embedding API Request error: {e}")
+                raise Exception(f"Embedding API Request error: {str(e)}")
             except (KeyError, IndexError) as e:
+                # Log invalid response format
+                print(f"Invalid response format from embedding API: {e}, Response: {response.text if response else 'N/A'}")
                 raise Exception(f"Invalid response format from embedding API: {str(e)}")
+            except Exception as e:
+                # Catch any other unexpected errors
+                print(f"An unexpected error occurred in Embedding API call: {e}")
+                raise Exception(f"An unexpected error occurred in Embedding API call: {str(e)}")
     
     async def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Get embeddings for multiple texts"""

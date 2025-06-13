@@ -28,7 +28,7 @@ class VectorService:
         self.embedding_service = EmbeddingService()
         
         # Vector configuration
-        self.collection_name = "document_chunks"
+        self.collection_name = self.settings.qdrant_collection_name
         self.vector_size = 4096  # Qwen3-Embedding-8B produces 4096-dimensional vectors
         
         # Track initialization status
@@ -164,6 +164,7 @@ class VectorService:
             
             # Generate query embedding
             query_embedding = await self.embedding_service.get_embedding(query_text)
+            print(f"DEBUG: Query embedding generated (first 5 values): {query_embedding[:5]}")
             
             from qdrant_client.models import Filter, FieldCondition, MatchValue
             # Build filter
@@ -184,6 +185,7 @@ class VectorService:
                 )
             
             query_filter = Filter(must=filter_conditions) if filter_conditions else None
+            print(f"DEBUG: Qdrant query filter: {query_filter.dict() if query_filter else 'None'}")
             
             # Perform search
             search_results = self.qdrant_client.search(
@@ -191,8 +193,13 @@ class VectorService:
                 query_vector=query_embedding,
                 query_filter=query_filter,
                 limit=limit,
-                score_threshold=score_threshold
+                score_threshold=score_threshold,
+                with_payload=True, # Ensure payload is returned for debugging
+                with_vectors=False # No need for vectors in results
             )
+            print(f"DEBUG: Qdrant search returned {len(search_results)} results.")
+            for i, hit in enumerate(search_results):
+                print(f"DEBUG: Result {i+1}: ID={hit.id}, Score={hit.score}, Payload_DocID={hit.payload.get('document_id')}, Payload_UserID={hit.payload.get('user_id')}")
             
             # Format results
             results = []

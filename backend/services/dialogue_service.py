@@ -67,10 +67,10 @@ class DialogueService:
             enriched_results = []
             for result in results:
                 enriched_result = {
-                    **result.model_dump(),
+                    **result, # 直接使用字典，因为它已经是所需格式
                     "retrieval_timestamp": datetime.utcnow().isoformat(),
                     "query": query,
-                    "similarity_score": result.score
+                    "similarity_score": result["score"] # 从字典中获取分数
                 }
                 enriched_results.append(enriched_result)
             
@@ -151,8 +151,9 @@ class DialogueService:
         history_text = ""
         if conversation_history:
             for msg in conversation_history[-5:]:  # Last 5 messages for context
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
+                # Assuming msg is a Pydantic model like ConversationMessage
+                role = msg.role if hasattr(msg, 'role') else "user"
+                content = msg.content if hasattr(msg, 'content') else ""
                 history_text += f"{role.upper()}: {content}\n"
         
         # Create the dialogue prompt
@@ -200,6 +201,8 @@ ASSISTANT: """
         start_time = time.time()
         
         try:
+            logger.info(f"Processing query: '{query[:50]}...' for user {user_id}, document {document_id}")
+            
             # Step 1: Search for relevant fragments
             fragments = await self.search_relevant_fragments(
                 query=query,
@@ -207,6 +210,7 @@ ASSISTANT: """
                 document_id=document_id,
                 limit=self.top_k_initial
             )
+            logger.info(f"Search for relevant fragments completed. Found {len(fragments)} fragments.")
             
             if not fragments:
                 return {
@@ -280,7 +284,7 @@ ASSISTANT: """
         start_time = time.time()
         
         try:
-            # Step 1: Search for relevant fragments
+            logger.info(f"Processing streaming query: '{query[:50]}...' for user {user_id}, document {document_id}")
             yield {"type": "status", "message": "Searching for relevant information..."}
             
             fragments = await self.search_relevant_fragments(
@@ -289,6 +293,7 @@ ASSISTANT: """
                 document_id=document_id,
                 limit=self.top_k_initial
             )
+            logger.info(f"Search for relevant fragments completed for streaming query. Found {len(fragments)} fragments.")
             
             if not fragments:
                 yield {
