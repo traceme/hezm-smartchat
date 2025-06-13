@@ -4,7 +4,7 @@ sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 redis==5.0.1
 celery==5.3.4
-qdrant-client==1.7.0
+qdrant-client
 markitdown==0.0.1a2
 python-multipart==0.0.6
 websockets==12.0
@@ -19,7 +19,7 @@ pydantic[email]==2.5.0
 pydantic-settings==2.1.0
 
 # Authentication and security
-passlib[bcrypt]==1.7.4
+passlib[bcrypt]
 python-jose[cryptography]==3.3.0
 
 # File handling
@@ -27,7 +27,10 @@ aiofiles==23.2.0
 python-magic==0.4.27
 
 # Testing (development)
-aiohttp==3.9.1 
+pytest==7.4.0
+pytest-asyncio==0.21.1
+aiohttp==3.9.1
+pytest-cov==4.1.0
 
 # Vector embeddings and text processing
 numpy>=1.24.0

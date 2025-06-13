@@ -8,7 +8,8 @@ from fastapi import UploadFile, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from backend.models.document import Document, DocumentType, DocumentStatus
+from backend.models.document import Document
+from backend.schemas.document import DocumentStatus, DocumentType # Import DocumentStatus and DocumentType enums
 
 
 def detect_file_type(file_path: str) -> str:
@@ -122,8 +123,10 @@ class FileService:
     """
     
     def __init__(self):
-        self.upload_directory = Path("uploads")
-        self.upload_directory.mkdir(exist_ok=True)
+        from backend.core.config import get_settings
+        settings = get_settings()
+        self.upload_directory = Path(settings.upload_dir)
+        self.upload_directory.mkdir(parents=True, exist_ok=True) # Use parents=True to create parent directories if they don't exist
         self.chunk_size = 8192  # 8KB chunks for file operations
     
     def detect_mime_type(self, file_path: str) -> str:
@@ -179,7 +182,7 @@ class FileService:
         sha256_hash.update(file_content)
         return sha256_hash.hexdigest()
     
-    def get_document_type(self, mime_type: str) -> DocumentType:
+    def get_document_type(self, mime_type: str) -> DocumentType: # Change return type hint to DocumentType
         """
         Map MIME type to DocumentType enum
         """
@@ -202,7 +205,7 @@ class FileService:
             # Validate file type
             if not file.content_type or not self.is_supported_file_type(f"dummy{Path(file.filename or '').suffix}"):
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"Unsupported file type: {file.content_type}. Supported: PDF, EPUB, TXT, DOCX, MD"
                 )
             
@@ -225,7 +228,7 @@ class FileService:
             existing_document = db.query(Document).filter(
                 Document.file_hash == file_hash,
                 Document.owner_id == user_id,
-                Document.status != DocumentStatus.DELETED
+                Document.status != DocumentStatus.DELETED.value # Use enum value
             ).first()
             
             if existing_document:
@@ -255,8 +258,8 @@ class FileService:
                 file_size=file_size,
                 file_hash=file_hash,
                 mime_type=file.content_type or self.detect_mime_type(str(file_path)),
-                document_type=self.get_document_type(file.content_type or '').value,
-                status=DocumentStatus.UPLOADING.value,
+                document_type=self.get_document_type(file.content_type or '').value, # Use enum value
+                status=DocumentStatus.UPLOADING.value, # Use enum value
                 owner_id=user_id,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
@@ -276,11 +279,13 @@ class FileService:
         except HTTPException:
             raise
         except Exception as e:
+            import traceback
+            error_detail = f"Upload failed in FileService: {str(e)}\n{traceback.format_exc()}"
             # Clean up file if it was created
             if 'file_path' in locals() and file_path.exists():
                 file_path.unlink()
             
-            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=error_detail)
 
 
 # Create a singleton instance

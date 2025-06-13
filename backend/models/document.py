@@ -1,22 +1,31 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, Enum, BigInteger, Float
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text, ForeignKey, BigInteger, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from backend.core.database import Base
-import enum
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from backend.core.database import Base
 
-class DocumentStatus(enum.Enum):
-    UPLOADING = "UPLOADING"
-    PROCESSING = "PROCESSING"
-    READY = "READY"
-    ERROR = "ERROR"
-    DELETED = "DELETED"
+# Define DocumentStatus and DocumentType as simple strings for database storage
+# These will be used as string values directly in the database,
+# avoiding PostgreSQL enum complexities.
+# For type hinting in Python, you can still use Literal or a custom type.
 
-class DocumentType(enum.Enum):
-    PDF = "PDF"
-    EPUB = "EPUB"
-    TXT = "TXT"
-    DOCX = "DOCX"
-    MD = "MD"
+# Document processing status
+DOCUMENT_STATUS_UPLOADING = "UPLOADING"
+DOCUMENT_STATUS_PROCESSING = "PROCESSING"
+DOCUMENT_STATUS_READY = "READY"
+DOCUMENT_STATUS_ERROR = "ERROR"
+DOCUMENT_STATUS_DELETED = "DELETED"
+DOCUMENT_STATUS_VECTORIZING = "VECTORIZING"
+DOCUMENT_STATUS_VECTORIZED = "VECTORIZED"
+
+# Document file types
+DOCUMENT_TYPE_PDF = "PDF"
+DOCUMENT_TYPE_EPUB = "EPUB"
+DOCUMENT_TYPE_TXT = "TXT"
+DOCUMENT_TYPE_DOCX = "DOCX"
+DOCUMENT_TYPE_MD = "MD"
 
 class Document(Base):
     __tablename__ = "documents"
@@ -29,8 +38,9 @@ class Document(Base):
     file_size = Column(BigInteger, nullable=False)  # Size in bytes
     file_hash = Column(String(64), nullable=False, index=True)  # SHA-256 hash
     mime_type = Column(String(100), nullable=False)
-    document_type = Column(Enum(DocumentType), nullable=False)
-    status = Column(Enum(DocumentStatus), default=DocumentStatus.UPLOADING, nullable=False, index=True)
+    document_type = Column(String(50), nullable=False) # Stored as string
+    status = Column(String(50), default=DOCUMENT_STATUS_UPLOADING, nullable=False, index=True) # Stored as string
+    category = Column(String(100), nullable=True, index=True) # New category field
     
     # Processing information
     markdown_content = Column(Text, nullable=True)  # Converted markdown content
@@ -50,7 +60,7 @@ class Document(Base):
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     def __repr__(self):
-        return f"<Document(id={self.id}, title='{self.title}', status='{self.status.value}')>"
+        return f"<Document(id={self.id}, title='{self.title}', status='{self.status}')>"
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"

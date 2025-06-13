@@ -24,7 +24,7 @@ class Settings:
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     
     # Embedding Model
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding-8b")
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "Qwen3-Embedding-8B")
     
     # Application
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"

@@ -12,7 +12,7 @@ This service provides comprehensive monitoring and optimization features for Red
 import logging
 import asyncio
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from backend.core.redis import RedisClient
 from backend.services.document_cache import get_document_cache
@@ -95,7 +95,7 @@ class CacheMonitor:
             
             # Combine all stats
             comprehensive_stats = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "redis_server": redis_stats,
                 "cache_services": cache_stats,
                 "aggregated": {
@@ -121,7 +121,7 @@ class CacheMonitor:
             redis_stats = await self.redis.get_detailed_stats()
             
             performance_analysis = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_performance": {},
                 "pattern_analysis": efficiency_analysis.get("patterns", {}),
                 "recommendations": efficiency_analysis.get("recommendations", []),
@@ -212,7 +212,7 @@ class CacheMonitor:
             analysis = await self.analyze_performance()
             
             optimization_suggestions = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "current_health_score": analysis.get("health_score", 0),
                 "optimizations": [],
                 "priority": "low"
@@ -283,7 +283,7 @@ class CacheMonitor:
         """Run comprehensive health check on all cache components"""
         try:
             health_status = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "overall_status": "healthy",
                 "components": {},
                 "summary": {}
@@ -309,8 +309,8 @@ class CacheMonitor:
             for service_name, cache_service in cache_services:
                 try:
                     # Test basic functionality
-                    test_key = f"health_check:{service_name}:{int(datetime.utcnow().timestamp())}"
-                    test_value = {"test": True, "timestamp": datetime.utcnow().isoformat()}
+                    test_key = f"health_check:{service_name}:{int(datetime.now(timezone.utc).timestamp())}"
+                    test_value = {"test": True, "timestamp": datetime.now(timezone.utc).isoformat()}
                     
                     # Test set operation
                     set_success = await cache_service.redis.set_json(test_key, test_value, ttl=60)

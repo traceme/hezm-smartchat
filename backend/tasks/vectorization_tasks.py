@@ -1,9 +1,10 @@
 from celery import current_app as celery_app
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
-from models.document import Document, DocumentChunk
+from backend.models.document import Document, DocumentChunk
+from backend.schemas.document import DocumentStatus # Import DocumentStatus
 from services.text_splitter import semantic_splitter
-from services.embedding_service import embedding_service
+from services.embedding_service import EmbeddingService
 import asyncio
 import traceback
 from typing import Dict, Any
@@ -27,15 +28,15 @@ def vectorize_document(self, document_id: int, user_id: int) -> Dict[str, Any]:
         if not document:
             raise Exception(f"Document {document_id} not found")
         
-        if not document.processed_content:
-            raise Exception(f"Document {document_id} has no processed content")
+        if not document.markdown_content:
+            raise Exception(f"Document {document_id} has no markdown content")
         
         # Update status
-        document.status = "vectorizing"
+        document.status = DocumentStatus.VECTORIZING.value
         db.commit()
         
         # Split text into semantic chunks
-        chunks = semantic_splitter.split_text(document.processed_content, document_id)
+        chunks = semantic_splitter.split_text(document.markdown_content, document_id)
         
         if not chunks:
             raise Exception("No chunks generated from document")
@@ -45,8 +46,9 @@ def vectorize_document(self, document_id: int, user_id: int) -> Dict[str, Any]:
         asyncio.set_event_loop(loop)
         
         try:
+            embedding_service_instance = EmbeddingService()
             result = loop.run_until_complete(
-                embedding_service.store_document_chunks(chunks, document_id, user_id)
+                embedding_service_instance.store_document_chunks(chunks, document_id, user_id)
             )
         finally:
             loop.close()
@@ -65,15 +67,15 @@ def vectorize_document(self, document_id: int, user_id: int) -> Dict[str, Any]:
                 token_count=chunk.token_count,
                 start_offset=chunk.start_offset,
                 end_offset=chunk.end_offset,
-                chunk_type=chunk.chunk_type,
-                section_header=chunk.section_header
+                #chunk_type=chunk.chunk_type,
+                #section_header=chunk.section_header
             )
             db_chunks.append(db_chunk)
         
         db.add_all(db_chunks)
         
         # Update document status and metadata
-        document.status = "vectorized"
+        document.status = DocumentStatus.VECTORIZED.value
         document.chunk_count = len(chunks)
         document.total_tokens = sum(chunk.token_count for chunk in chunks)
         db.commit()
@@ -92,8 +94,8 @@ def vectorize_document(self, document_id: int, user_id: int) -> Dict[str, Any]:
             db = next(get_db())
             document = db.query(Document).filter(Document.id == document_id).first()
             if document:
-                document.status = "vectorization_failed"
-                document.error_message = str(e)
+                document.status = DocumentStatus.ERROR.value # Use ERROR status for vectorization failure
+                document.processing_error = str(e) # Use processing_error field
                 db.commit()
         except:
             pass
@@ -136,7 +138,7 @@ def update_document_vectors(self, document_id: int, user_id: int) -> Dict[str, A
             return vectorize_document.delay(document_id, user_id).get()
         
         # Update status
-        document.status = "re_vectorizing"
+        document.status = DocumentStatus.VECTORIZING.value
         db.commit()
         
         # Convert DB chunks to TextChunk objects
@@ -159,20 +161,21 @@ def update_document_vectors(self, document_id: int, user_id: int) -> Dict[str, A
         asyncio.set_event_loop(loop)
         
         try:
+            embedding_service_instance = EmbeddingService()
             # Delete old vectors
             await_result = loop.run_until_complete(
-                embedding_service.delete_document_chunks(document_id)
+                embedding_service_instance.delete_document_chunks(document_id)
             )
             
             # Store new vectors
             result = loop.run_until_complete(
-                embedding_service.store_document_chunks(text_chunks, document_id, user_id)
+                embedding_service_instance.store_document_chunks(text_chunks, document_id, user_id)
             )
         finally:
             loop.close()
         
         # Update document status
-        document.status = "vectorized"
+        document.status = DocumentStatus.VECTORIZED.value
         db.commit()
         
         return {
@@ -188,8 +191,8 @@ def update_document_vectors(self, document_id: int, user_id: int) -> Dict[str, A
             db = next(get_db())
             document = db.query(Document).filter(Document.id == document_id).first()
             if document:
-                document.status = "vectorization_failed"
-                document.error_message = str(e)
+                document.status = DocumentStatus.ERROR.value # Use ERROR status for vectorization failure
+                document.processing_error = str(e) # Use processing_error field
                 db.commit()
         except:
             pass
@@ -224,8 +227,9 @@ def cleanup_orphaned_vectors(self) -> Dict[str, Any]:
         asyncio.set_event_loop(loop)
         
         try:
+            embedding_service_instance = EmbeddingService()
             collection_info = loop.run_until_complete(
-                embedding_service.get_collection_info()
+                embedding_service_instance.get_collection_info()
             )
         finally:
             loop.close()

@@ -27,6 +27,8 @@ config = context.config
 # Get settings and set the SQLAlchemy URL
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)
+print(f"DEBUG: database_url from settings: {settings.database_url}")
+print(f"DEBUG: sqlalchemy.url in config: {config.get_main_option("sqlalchemy.url")}")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

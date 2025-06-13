@@ -14,7 +14,8 @@ from markitdown import MarkItDown
 from services.websocket_service import websocket_manager, ProgressType
 from config import settings
 
-from backend.models.document import Document, DocumentChunk, DocumentStatus, DocumentType
+from backend.models.document import Document, DocumentChunk
+from backend.schemas.document import DocumentStatus, DocumentType # Import DocumentStatus and DocumentType enums
 
 class DocumentProcessor:
     def __init__(self):
@@ -33,7 +34,7 @@ class DocumentProcessor:
                 raise ValueError(f"Document {document_id} not found")
             
             # Update status to processing
-            document.status = DocumentStatus.PROCESSING
+            document.status = DocumentStatus.PROCESSING.value
             db.commit()
             
             # Send progress update
@@ -93,7 +94,7 @@ class DocumentProcessor:
             )
             
             # Update document status to ready
-            document.status = DocumentStatus.READY
+            document.status = DocumentStatus.READY.value
             db.commit()
             
             # Trigger vectorization task
@@ -120,7 +121,7 @@ class DocumentProcessor:
             # Update document status to error
             document = db.query(Document).filter(Document.id == document_id).first()
             if document:
-                document.status = DocumentStatus.ERROR
+                document.status = DocumentStatus.ERROR.value
                 document.processing_error = str(e)
                 db.commit()
             
@@ -140,7 +141,7 @@ class DocumentProcessor:
             file_path = Path(document.file_path)
             
             # Convert based on document type
-            if document.document_type == DocumentType.TXT:
+            if document.document_type == DocumentType.TXT.value:
                 # For text files, read directly and add minimal markdown structure
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -151,7 +152,7 @@ class DocumentProcessor:
                 
                 return content
                 
-            elif document.document_type == DocumentType.MD:
+            elif document.document_type == DocumentType.MD.value:
                 # For markdown files, read directly
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -163,7 +164,7 @@ class DocumentProcessor:
                 if result and result.text_content:
                     return result.text_content
                 else:
-                    raise ValueError(f"Failed to convert {document.document_type.value} file")
+                    raise ValueError(f"Failed to convert {document.document_type} file")
         
         except Exception as e:
             raise ValueError(f"Conversion failed: {str(e)}")

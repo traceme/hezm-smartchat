@@ -12,7 +12,7 @@ from backend.services.document_cache import document_cache
 from backend.services.search_cache import search_cache
 from backend.services.conversation_cache import get_conversation_cache
 from backend.schemas.document import DocumentUploadResponse, DocumentProcessingStatus
-from backend.models.document import Document, DocumentStatus
+from backend.models.document import Document, DOCUMENT_STATUS_UPLOADING, DOCUMENT_STATUS_PROCESSING, DOCUMENT_STATUS_READY, DOCUMENT_STATUS_ERROR, DOCUMENT_STATUS_DELETED
 
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
 
@@ -231,20 +231,20 @@ async def delete_file(
     await file_service.delete_file(document)
     
     # Update database record
-    document.status = DocumentStatus.DELETED
+    document.status = DOCUMENT_STATUS_DELETED
     db.commit()
     
     return {"message": "File deleted successfully"}
 
 # Document processing is now handled by Celery tasks in tasks/document_tasks.py
 
-def get_status_description(status: DocumentStatus) -> str:
+def get_status_description(status: str) -> str: # Change type hint to str
     """Get human-readable status description."""
     descriptions = {
-        DocumentStatus.UPLOADING: "Uploading file...",
-        DocumentStatus.PROCESSING: "Processing document...",
-        DocumentStatus.READY: "Ready for conversations",
-        DocumentStatus.ERROR: "Processing failed",
-        DocumentStatus.DELETED: "File deleted"
+        DOCUMENT_STATUS_UPLOADING: "Uploading file...",
+        DOCUMENT_STATUS_PROCESSING: "Processing document...",
+        DOCUMENT_STATUS_READY: "Ready for conversations",
+        DOCUMENT_STATUS_ERROR: "Processing failed",
+        DOCUMENT_STATUS_DELETED: "File deleted"
     }
-    return descriptions.get(status, "Unknown status") 
+    return descriptions.get(status, "Unknown status")

@@ -1,7 +1,30 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
-from backend.models.document import DocumentStatus, DocumentType
+from enum import Enum
+from backend.models.document import (
+    DOCUMENT_STATUS_UPLOADING, DOCUMENT_STATUS_PROCESSING, DOCUMENT_STATUS_READY,
+    DOCUMENT_STATUS_ERROR, DOCUMENT_STATUS_DELETED,
+    DOCUMENT_STATUS_VECTORIZING, DOCUMENT_STATUS_VECTORIZED, # New statuses
+    DOCUMENT_TYPE_PDF, DOCUMENT_TYPE_EPUB, DOCUMENT_TYPE_TXT,
+    DOCUMENT_TYPE_DOCX, DOCUMENT_TYPE_MD
+)
+
+class DocumentStatus(str, Enum):
+    UPLOADING = DOCUMENT_STATUS_UPLOADING
+    PROCESSING = DOCUMENT_STATUS_PROCESSING
+    READY = DOCUMENT_STATUS_READY
+    ERROR = DOCUMENT_STATUS_ERROR
+    DELETED = DOCUMENT_STATUS_DELETED
+    VECTORIZING = DOCUMENT_STATUS_VECTORIZING # New status
+    VECTORIZED = DOCUMENT_STATUS_VECTORIZED   # New status
+
+class DocumentType(str, Enum):
+    PDF = DOCUMENT_TYPE_PDF
+    EPUB = DOCUMENT_TYPE_EPUB
+    TXT = DOCUMENT_TYPE_TXT
+    DOCX = DOCUMENT_TYPE_DOCX
+    MD = DOCUMENT_TYPE_MD
 
 # Base document schema
 class DocumentBase(BaseModel):
@@ -14,11 +37,12 @@ class DocumentCreate(DocumentBase):
 # Schema for document update
 class DocumentUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
-    status: Optional[DocumentStatus] = None
+    status: Optional[str] = None # Change to str
 
 # Schema for document update request
 class DocumentUpdateRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
+    category: Optional[str] = Field(None, max_length=100)
 
 # Schema for document response
 class Document(DocumentBase):
@@ -27,8 +51,9 @@ class Document(DocumentBase):
     file_size: int
     file_hash: str
     mime_type: str
-    document_type: DocumentType
-    status: DocumentStatus
+    document_type: str # Change to str
+    status: str # Change to str
+    category: Optional[str] = None # Add category field
     page_count: Optional[int] = None
     word_count: Optional[int] = None
     language: Optional[str] = None
@@ -48,6 +73,7 @@ class DocumentResponse(BaseModel):
     original_filename: str
     document_type: str
     status: str
+    category: Optional[str] = None # Add category field
     file_size: int
     file_size_display: str
     page_count: Optional[int] = None
@@ -82,8 +108,8 @@ class DocumentSummary(BaseModel):
     title: str
     original_filename: str
     file_size: int
-    document_type: DocumentType
-    status: DocumentStatus
+    document_type: str # Change to str
+    status: str # Change to str
     page_count: Optional[int] = None
     word_count: Optional[int] = None
     created_at: datetime
@@ -119,7 +145,7 @@ class DocumentUploadResponse(BaseModel):
 # Schema for document processing status
 class DocumentProcessingStatus(BaseModel):
     document_id: int
-    status: DocumentStatus
+    status: str # Change to str
     progress_percentage: Optional[int] = None
     current_step: Optional[str] = None
-    error_message: Optional[str] = None 
+    error_message: Optional[str] = None

@@ -437,14 +437,15 @@ async def close_redis():
         _redis_client = None
 
 
-@lru_cache()
-def get_redis_client() -> RedisClient:
+def get_redis_client() -> Optional[RedisClient]: # Change return type to Optional
     """FastAPI dependency to get Redis client (synchronous)."""
     global _redis_client
     
     if _redis_client is None:
-        # This should not happen if init_redis() was called during startup
-        logger.warning("Redis client not initialized, returning None")
+        # This indicates init_redis was not awaited or failed.
+        # In a synchronous context, we cannot await init_redis here.
+        # The application startup should ensure _redis_client is initialized.
+        logger.warning("Redis client not initialized, returning None. Ensure init_redis() is awaited during startup.")
         return None
     
     return _redis_client

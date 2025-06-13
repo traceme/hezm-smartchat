@@ -4,15 +4,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, desc, asc
 from typing import Optional, List
 from datetime import datetime
-from enum import Enum
-
 from backend.core.database import get_db
-from backend.models.document import Document, DocumentStatus, DocumentType
+from backend.models.document import Document
 from backend.schemas.document import (
-    DocumentResponse, 
-    DocumentListResponse, 
+    DocumentResponse,
+    DocumentListResponse,
     DocumentUpdateRequest,
-    DocumentMetadata
+    DocumentMetadata,
+    DocumentStatus, # Import DocumentStatus enum
+    DocumentType    # Import DocumentType enum
 )
 from backend.services.document_cache import document_cache
 from backend.services.search_cache import search_cache
@@ -40,21 +40,17 @@ async def list_documents(
     Get list of documents for the current user with filtering, searching, and sorting (cached).
     """
     # Validate sort field first (before caching attempt)
-    valid_sort_fields = ['title', 'created_at', 'updated_at', 'file_size', 'status']
+    valid_sort_fields = ['title', 'created_at', 'updated_at', 'file_size', 'status', 'category']
     if sort_by not in valid_sort_fields:
         raise HTTPException(status_code=400, detail=f"Invalid sort field: {sort_by}")
     
     # Validate status and document_type
     if status:
-        try:
-            DocumentStatus(status.lower())
-        except ValueError:
+        if status.upper() not in DocumentStatus.__members__:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
     if document_type:
-        try:
-            DocumentType(document_type.lower())
-        except ValueError:
+        if document_type.upper() not in DocumentType.__members__:
             raise HTTPException(status_code=400, detail=f"Invalid document type: {document_type}")
     
     # Try to get from cache first
@@ -84,7 +80,7 @@ async def list_documents(
 
             # Calculate processing progress for processing documents
             processing_progress = None
-            if doc_data['status'] == DocumentStatus.PROCESSING.value:
+            if doc_data['status'] == DocumentStatus.PROCESSING:
                 processing_progress = 65
 
             document_list.append(DocumentResponse(
@@ -93,6 +89,7 @@ async def list_documents(
                 original_filename=doc_data['original_filename'],
                 document_type=doc_data['document_type'],
                 status=doc_data['status'],
+                category=doc_data['category'], # Include category
                 file_size=doc_data['file_size'],
                 file_size_display=size_str,
                 page_count=doc_data['page_count'],
@@ -141,7 +138,7 @@ async def get_document(
 
     # Calculate processing progress for processing documents
     processing_progress = None
-    if doc_data['status'] == DocumentStatus.PROCESSING.value:
+    if doc_data['status'] == DocumentStatus.PROCESSING:
         processing_progress = 65
 
     return DocumentResponse(
@@ -150,6 +147,7 @@ async def get_document(
         original_filename=doc_data['original_filename'],
         document_type=doc_data['document_type'],
         status=doc_data['status'],
+        category=doc_data['category'], # Include category
         file_size=doc_data['file_size'],
         file_size_display=size_str,
         page_count=doc_data['page_count'],
@@ -175,7 +173,7 @@ async def update_document(
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.owner_id == user_id,
-        Document.status != DocumentStatus.DELETED
+        Document.status != DocumentStatus.DELETED.value
     ).first()
 
     if not document:
@@ -184,10 +182,9 @@ async def update_document(
     # Update fields if provided
     if update_data.title is not None:
         document.title = update_data.title
-
-    # Add more updateable fields as needed in the future
-    # if update_data.category is not None:
-    #     document.category = update_data.category
+    
+    if update_data.category is not None:
+        document.category = update_data.category
 
     db.commit()
     db.refresh(document)
@@ -209,15 +206,16 @@ async def update_document(
 
     # Calculate processing progress for processing documents
     processing_progress = None
-    if document.status == DocumentStatus.PROCESSING:
+    if document.status == DocumentStatus.PROCESSING.value:
         processing_progress = 65
 
     return DocumentResponse(
         id=document.id,
         title=document.title,
         original_filename=document.original_filename,
-        document_type=document.document_type.value,
-        status=document.status.value,
+        document_type=document.document_type,
+        status=document.status,
+        category=document.category, # Include category
         file_size=document.file_size,
         file_size_display=size_str,
         page_count=document.page_count,
@@ -249,7 +247,7 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    if document.status == DocumentStatus.DELETED and not permanent:
+    if document.status == DocumentStatus.DELETED.value and not permanent:
         raise HTTPException(status_code=400, detail="Document already deleted")
 
     if permanent:
@@ -270,7 +268,7 @@ async def delete_document(
         return {"message": "Document permanently deleted", "document_id": document_id}
     else:
         # Soft delete - set status to DELETED
-        document.status = DocumentStatus.DELETED
+        document.status = DocumentStatus.DELETED.value
         db.commit()
         
         # Invalidate caches
@@ -314,7 +312,7 @@ async def bulk_delete_documents(
     
     deleted_count = 0
     for document in documents:
-        if document.status == DocumentStatus.DELETED and not permanent:
+        if document.status == DocumentStatus.DELETED.value and not permanent:
             continue  # Skip already deleted documents
             
         if permanent:
@@ -322,7 +320,7 @@ async def bulk_delete_documents(
             db.delete(document)
         else:
             # Soft delete
-            document.status = DocumentStatus.DELETED
+            document.status = DocumentStatus.DELETED.value
         deleted_count += 1
 
     db.commit()
@@ -358,29 +356,29 @@ async def get_document_stats(
     """
     # Get counts by status
     status_counts = {}
-    for status in DocumentStatus:
-        if status == DocumentStatus.DELETED:
+    for status_enum in DocumentStatus:
+        if status_enum == DocumentStatus.DELETED:
             continue
         count = db.query(Document).filter(
             Document.owner_id == user_id,
-            Document.status == status
+            Document.status == status_enum.value
         ).count()
-        status_counts[status.value] = count
+        status_counts[status_enum.value] = count
 
     # Get counts by document type
     type_counts = {}
-    for doc_type in DocumentType:
+    for doc_type_enum in DocumentType:
         count = db.query(Document).filter(
             Document.owner_id == user_id,
-            Document.document_type == doc_type,
-            Document.status != DocumentStatus.DELETED
+            Document.document_type == doc_type_enum.value,
+            Document.status != DocumentStatus.DELETED.value
         ).count()
-        type_counts[doc_type.value] = count
+        type_counts[doc_type_enum.value] = count
 
     # Get total storage used
     total_size = db.query(db.func.sum(Document.file_size)).filter(
         Document.owner_id == user_id,
-        Document.status != DocumentStatus.DELETED
+        Document.status != DocumentStatus.DELETED.value
     ).scalar() or 0
 
     # Format total size

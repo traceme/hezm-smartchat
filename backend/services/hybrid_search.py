@@ -12,7 +12,7 @@ from datetime import datetime
 import json
 
 from backend.models.document import Document, DocumentChunk
-from services.embedding_service import embedding_service
+from services.embedding_service import EmbeddingService
 from services.text_splitter import TextChunk
 
 @dataclass
@@ -174,6 +174,7 @@ class HybridSearchEngine:
     
     def __init__(self):
         self.keyword_engine = KeywordSearchEngine()
+        self.embedding_service = EmbeddingService()
         
         # Fusion weights (can be tuned based on query type)
         self.default_vector_weight = 0.7
@@ -305,7 +306,7 @@ class HybridSearchEngine:
     ) -> List[Dict[str, Any]]:
         """Perform vector similarity search."""
         try:
-            results = await embedding_service.search_similar_chunks(
+            results = await self.embedding_service.search_similar_chunks(
                 query_text=query,
                 user_id=user_id,
                 document_id=document_id,

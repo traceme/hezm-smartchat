@@ -17,10 +17,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 from services.hybrid_search import hybrid_search_engine, KeywordSearchEngine
-from services.text_splitter import semantic_splitter
-from services.embedding_service import embedding_service
-from database import SessionLocal
-from models.document import Document, DocumentChunk
+from backend.services.text_splitter import semantic_splitter
+from backend.services.embedding_service import embedding_service
+from backend.core.database import SessionLocal
+from backend.models.document import Document, DocumentChunk
 import tempfile
 import json
 
@@ -209,7 +209,6 @@ model = tf.keras.Sequential([
 
 Machine learning continues to evolve rapidly, offering powerful tools for solving complex problems across industries. Success requires combining theoretical understanding with practical experience and staying current with emerging trends and best practices.
 """,
-    
     "python_tutorial": """
 # Python Programming Tutorial
 
@@ -535,7 +534,7 @@ even_numbers = [x for x in range(20) if x % 2 == 0]
 ### Documentation and Testing
 ```python
 def fibonacci(n):
-    """
+    \"\"\"
     Generate the nth Fibonacci number.
     
     Args:
@@ -546,7 +545,7 @@ def fibonacci(n):
         
     Raises:
         ValueError: If n is negative
-    """
+    \"\"\"
     if n < 0:
         raise ValueError("n must be non-negative")
     if n <= 1:

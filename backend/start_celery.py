@@ -17,7 +17,7 @@ def start_worker():
     worker_options = [
         'worker',
         '--loglevel=info',
-        '--concurrency=2',  # Number of worker processes
+        '--pool=solo',  # Run in a single process to avoid multiprocessing issues on macOS
         '--queues=document_processing,celery',  # Listen to specific queues
         '--hostname=smartchat-worker@%h',
     ]

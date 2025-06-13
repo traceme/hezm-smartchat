@@ -58,7 +58,7 @@ class ErrorResponse(BaseModel):
     error: BaseErrorResponse = Field(..., description="Error information")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "error": {
                     "code": "DOCUMENT_NOT_FOUND",

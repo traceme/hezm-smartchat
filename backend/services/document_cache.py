@@ -8,18 +8,19 @@ document lists, and related operations to improve performance.
 import json
 import hashlib
 from typing import Optional, List, Dict, Any, Union
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_, desc, asc
+from sqlalchemy import or_, and_, desc, asc, func
 
 from backend.core.redis import (
-    get_redis_client, 
+    get_redis_client,
     make_document_key,
-    redis_operation
+    redis_operation,
+    RedisClient
 )
 from backend.core.logging import get_app_logger
-from backend.models.document import Document, DocumentStatus, DocumentType
-from backend.schemas.document import DocumentResponse
+from backend.models.document import Document
+from backend.schemas.document import DocumentResponse, DocumentStatus # Import DocumentStatus
 
 logger = get_app_logger()
 
@@ -27,7 +28,8 @@ logger = get_app_logger()
 class DocumentCache:
     """Document caching service with Redis backend."""
     
-    def __init__(self):
+    def __init__(self, redis_client: Optional[RedisClient] = None):
+        self.redis_client = redis_client if redis_client else get_redis_client()
         self.cache_ttl = {
             'document_metadata': 3600,  # 1 hour
             'document_list': 900,       # 15 minutes
@@ -82,6 +84,7 @@ class DocumentCache:
             'mime_type': document.mime_type,
             'document_type': document.document_type.value if hasattr(document.document_type, 'value') else document.document_type,
             'status': document.status.value if hasattr(document.status, 'value') else document.status,
+            'category': document.category,
             'markdown_content': document.markdown_content,
             'processing_error': document.processing_error,
             'processed_at': document.processed_at.isoformat() if document.processed_at else None,
@@ -118,18 +121,17 @@ class DocumentCache:
         """
         cache_key = make_document_key(document_id)
         
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    # Try to get from cache
-                    cached_data = await redis_client.get_json(cache_key)
-                    if cached_data:
-                        logger.debug(f"Cache HIT for document {document_id}")
-                        return self._deserialize_document(cached_data)
-                    
-                    logger.debug(f"Cache MISS for document {document_id}")
-                except Exception as e:
-                    logger.error(f"Cache read error for document {document_id}: {e}")
+        if self.redis_client:
+            try:
+                # Try to get from cache
+                cached_data = await self.redis_client.get_json(cache_key)
+                if cached_data:
+                    logger.debug(f"Cache HIT for document {document_id}")
+                    return self._deserialize_document(cached_data)
+                
+                logger.debug(f"Cache MISS for document {document_id}")
+            except Exception as e:
+                logger.error(f"Cache read error for document {document_id}: {e}")
         
         # Cache miss or Redis unavailable - fetch from database
         document = db.query(Document).filter(
@@ -145,17 +147,16 @@ class DocumentCache:
         doc_data = self._serialize_document(document)
         
         # Cache the result
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    await redis_client.set_json(
-                        cache_key, 
-                        doc_data, 
-                        ttl=self.cache_ttl['document_metadata']
-                    )
-                    logger.debug(f"Cached document {document_id}")
-                except Exception as e:
-                    logger.error(f"Cache write error for document {document_id}: {e}")
+        if self.redis_client:
+            try:
+                await self.redis_client.set_json(
+                    cache_key,
+                    doc_data,
+                    ttl=self.cache_ttl['document_metadata']
+                )
+                logger.debug(f"Cached document {document_id}")
+            except Exception as e:
+                logger.error(f"Cache write error for document {document_id}: {e}")
         
         return self._deserialize_document(doc_data)
     
@@ -177,32 +178,33 @@ class DocumentCache:
         
         Cache key includes all query parameters for proper cache hits.
         """
+        logger.debug(f"Attempting to get document list for user {user_id} from cache or DB.")
         cache_key = self._make_list_cache_key(
             user_id, search, status, document_type, category,
             sort_by, sort_order, skip, limit
         )
         
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    # Try to get from cache
-                    cached_data = await redis_client.get_json(cache_key)
-                    if cached_data:
-                        logger.debug(f"Cache HIT for document list (user {user_id})")
-                        
-                        # Deserialize document data
-                        if 'documents' in cached_data:
-                            cached_data['documents'] = [
-                                self._deserialize_document(doc) 
-                                for doc in cached_data['documents']
-                            ]
-                        
-                        return cached_data
+        if self.redis_client:
+            try:
+                # Try to get from cache
+                cached_data = await self.redis_client.get_json(cache_key)
+                if cached_data:
+                    logger.debug(f"Cache HIT for document list (user {user_id})")
                     
-                    logger.debug(f"Cache MISS for document list (user {user_id})")
-                except Exception as e:
-                    logger.error(f"Cache read error for document list: {e}")
+                    # Deserialize document data
+                    if 'documents' in cached_data:
+                        cached_data['documents'] = [
+                            self._deserialize_document(doc)
+                            for doc in cached_data['documents']
+                        ]
+                    logger.debug(f"Returning cached document list for user {user_id}.")
+                    return cached_data
+                
+                logger.debug(f"Cache MISS for document list (user {user_id})")
+            except Exception as e:
+                logger.error(f"Cache read error for document list: {e}")
         
+        logger.debug(f"Fetching document list for user {user_id} from database.")
         # Cache miss or Redis unavailable - fetch from database
         query = db.query(Document).filter(
             Document.owner_id == user_id,
@@ -219,21 +221,15 @@ class DocumentCache:
 
         # Apply status filter
         if status:
-            try:
-                status_enum = DocumentStatus(status.lower())
-                query = query.filter(Document.status == status_enum)
-            except ValueError:
-                # Invalid status, let the API handle the error
-                pass
+            query = query.filter(Document.status == status) # Directly use status string
 
         # Apply document type filter
         if document_type:
-            try:
-                type_enum = DocumentType(document_type.lower())
-                query = query.filter(Document.document_type == type_enum)
-            except ValueError:
-                # Invalid type, let the API handle the error
-                pass
+            query = query.filter(Document.document_type == document_type) # Directly use document_type string
+
+        # Apply category filter
+        if category:
+            query = query.filter(Document.category == category)
 
         # Apply sorting
         valid_sort_fields = {
@@ -241,7 +237,8 @@ class DocumentCache:
             'created_at': Document.created_at,
             'updated_at': Document.updated_at,
             'file_size': Document.file_size,
-            'status': Document.status
+            'status': Document.status,
+            'category': Document.category
         }
         
         if sort_by in valid_sort_fields:
@@ -267,30 +264,69 @@ class DocumentCache:
             'skip': skip,
             'limit': limit,
             'has_more': total_count > (skip + len(documents)),
-            'cached_at': datetime.utcnow().isoformat()
+            'cached_at': datetime.now(UTC).isoformat()
         }
         
         # Cache the result
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    await redis_client.set_json(
-                        cache_key, 
-                        cache_data, 
-                        ttl=self.cache_ttl['document_list']
-                    )
-                    logger.debug(f"Cached document list for user {user_id}")
-                except Exception as e:
-                    logger.error(f"Cache write error for document list: {e}")
+        if self.redis_client:
+            try:
+                await self.redis_client.set_json(
+                    cache_key,
+                    cache_data,
+                    ttl=self.cache_ttl['document_list']
+                )
+                logger.debug(f"Cached document list for user {user_id}")
+            except Exception as e:
+                logger.error(f"Cache write error for document list: {e}")
         
         # Deserialize for return
         cache_data['documents'] = [
-            self._deserialize_document(doc) 
+            self._deserialize_document(doc)
             for doc in cache_data['documents']
         ]
         
+        logger.debug(f"Successfully fetched and prepared document list for user {user_id} from database.")
         return cache_data
     
+    async def update_document_cache(self, document: Document) -> None:
+        """
+        Update or add a document's metadata in the cache.
+        
+        This is called when a document is created or updated.
+        """
+        cache_key = make_document_key(document.id)
+        doc_data = self._serialize_document(document)
+        
+        if self.redis_client:
+            try:
+                await self.redis_client.set_json(
+                    cache_key,
+                    doc_data,
+                    ttl=self.cache_ttl['document_metadata']
+                )
+                logger.debug(f"Updated cache for document {document.id}")
+            except Exception as e:
+                logger.error(f"Cache write error for document {document.id}: {e}")
+
+    async def delete_document_from_cache(self, document_id: int) -> bool:
+        """
+        Delete a document's metadata from the cache.
+        
+        This is called when a document is deleted.
+        """
+        cache_key = make_document_key(document_id)
+        
+        if self.redis_client:
+            try:
+                result = await self.redis_client.delete(cache_key)
+                if result:
+                    logger.debug(f"Deleted document {document_id} from cache")
+                return result
+            except Exception as e:
+                logger.error(f"Cache deletion error for document {document_id}: {e}")
+                return False
+        return False
+
     async def invalidate_document_cache(self, document_id: int) -> bool:
         """
         Invalidate cache for a specific document.
@@ -299,16 +335,15 @@ class DocumentCache:
         """
         cache_key = make_document_key(document_id)
         
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    result = await redis_client.delete(cache_key)
-                    if result:
-                        logger.debug(f"Invalidated cache for document {document_id}")
-                    return result
-                except Exception as e:
-                    logger.error(f"Cache invalidation error for document {document_id}: {e}")
-                    return False
+        if self.redis_client:
+            try:
+                result = await self.redis_client.delete(cache_key)
+                if result:
+                    logger.debug(f"Invalidated cache for document {document_id}")
+                return result
+            except Exception as e:
+                logger.error(f"Cache invalidation error for document {document_id}: {e}")
+                return False
         
         return False
     
@@ -320,16 +355,15 @@ class DocumentCache:
         """
         pattern = f"docs:list:{user_id}:*"
         
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    deleted_count = await redis_client.delete_pattern(pattern)
-                    if deleted_count > 0:
-                        logger.debug(f"Invalidated {deleted_count} list cache entries for user {user_id}")
-                    return deleted_count
-                except Exception as e:
-                    logger.error(f"Cache invalidation error for user {user_id} lists: {e}")
-                    return 0
+        if self.redis_client:
+            try:
+                deleted_count = await self.redis_client.delete_pattern(pattern)
+                if deleted_count > 0:
+                    logger.debug(f"Invalidated {deleted_count} list cache entries for user {user_id}")
+                return deleted_count
+            except Exception as e:
+                logger.error(f"Cache invalidation error for user {user_id} lists: {e}")
+                return 0
         
         return 0
     
@@ -349,16 +383,70 @@ class DocumentCache:
         
         # Invalidate document stats
         stats_key = self._make_stats_cache_key(user_id)
-        async with redis_operation() as redis_client:
-            if redis_client:
-                try:
-                    if await redis_client.delete(stats_key):
-                        results['document_stats'] = 1
-                        logger.debug(f"Invalidated stats cache for user {user_id}")
-                except Exception as e:
-                    logger.error(f"Stats cache invalidation error for user {user_id}: {e}")
+        if self.redis_client:
+            try:
+                if await self.redis_client.delete(stats_key):
+                    results['document_stats'] = 1
+                    logger.debug(f"Invalidated stats cache for user {user_id}")
+            except Exception as e:
+                logger.error(f"Stats cache invalidation error for user {user_id}: {e}")
         
         return results
+
+
+    async def get_document_stats(self, db: Session, user_id: int) -> Dict[str, int]:
+        """
+        Get document statistics with caching.
+        
+        Returns total documents, total pages, and total words for a user.
+        """
+        cache_key = self._make_stats_cache_key(user_id)
+        
+        if self.redis_client:
+            try:
+                cached_data = await self.redis_client.get_json(cache_key)
+                if cached_data:
+                    logger.debug(f"Cache HIT for document stats (user {user_id})")
+                    return cached_data
+                logger.debug(f"Cache MISS for document stats (user {user_id})")
+            except Exception as e:
+                logger.error(f"Cache read error for document stats: {e}")
+        
+        # Cache miss or Redis unavailable - fetch from database
+        stats = db.query(
+            Document.owner_id,
+            Document.page_count,
+            Document.word_count
+        ).filter(
+            Document.owner_id == user_id,
+            Document.status != DocumentStatus.DELETED
+        ).with_entities(
+            func.count(Document.id).label("total_documents"),
+            func.sum(Document.page_count).label("total_pages"),
+            func.sum(Document.word_count).label("total_words")
+        ).first()
+
+        total_documents, total_pages, total_words = stats if stats else (0, 0, 0)
+        
+        stats_data = {
+            "total_documents": total_documents or 0,
+            "total_pages": total_pages or 0,
+            "total_words": total_words or 0
+        }
+        
+        # Cache the result
+        if self.redis_client:
+            try:
+                await self.redis_client.set_json(
+                    cache_key,
+                    stats_data,
+                    ttl=self.cache_ttl['document_stats']
+                )
+                logger.debug(f"Cached document stats for user {user_id}")
+            except Exception as e:
+                logger.error(f"Cache write error for document stats: {e}")
+        
+        return stats_data
 
 
 # Global document cache instance
@@ -367,4 +455,4 @@ document_cache = DocumentCache()
 
 def get_document_cache() -> DocumentCache:
     """Get the global document cache instance."""
-    return document_cache 
+    return document_cache

@@ -124,9 +124,10 @@ def cleanup_failed_documents_task():
         db = SessionLocal()
         
         # Get documents with error status
-        from models.document import Document, DocumentStatus
+        from backend.models.document import Document
+        from backend.schemas.document import DocumentStatus # Import DocumentStatus enum
         failed_docs = db.query(Document).filter(
-            Document.status == DocumentStatus.ERROR
+            Document.status == DocumentStatus.ERROR.value
         ).all()
         
         results = []

@@ -20,7 +20,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GOOGLE_API_KEY=your_google_api_key_here
 
 # Embedding Model
-EMBEDDING_MODEL=qwen3-embedding-8b
+EMBEDDING_MODEL=Qwen3-Embedding-8B
 
 # Application
 DEBUG=false

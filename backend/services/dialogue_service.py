@@ -67,10 +67,10 @@ class DialogueService:
             enriched_results = []
             for result in results:
                 enriched_result = {
-                    **result,
+                    **result.model_dump(),
                     "retrieval_timestamp": datetime.utcnow().isoformat(),
                     "query": query,
-                    "similarity_score": result["score"]
+                    "similarity_score": result.score
                 }
                 enriched_results.append(enriched_result)
             
@@ -230,7 +230,7 @@ ASSISTANT: """
             )
             
             # Step 4: Generate response using LLM
-            provider = LLMProvider(model_preference.lower()) if model_preference.lower() in ["openai", "claude", "gemini"] else LLMProvider.OPENAI
+            provider = LLMProvider(model_preference) if model_preference in ["openai", "claude", "gemini"] else LLMProvider.OPENAI
             
             llm_response = await self.llm_service.generate_with_fallback(
                 prompt=prompt,
@@ -319,7 +319,7 @@ ASSISTANT: """
             # Step 4: Generate streaming response using LLM
             yield {"type": "status", "message": "Generating response..."}
             
-            provider = LLMProvider(model_preference.lower()) if model_preference.lower() in ["openai", "claude", "gemini"] else LLMProvider.OPENAI
+            provider = LLMProvider(model_preference) if model_preference in ["openai", "claude", "gemini"] else LLMProvider.OPENAI
             
             full_response = ""
             async for chunk in self.llm_service.stream_generate_response(prompt, provider):
@@ -348,6 +348,7 @@ ASSISTANT: """
                 "type": "error",
                 "error": str(e)
             }
+            return
     
     async def close(self):
         """Close connections and cleanup resources."""

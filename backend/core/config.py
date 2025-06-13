@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     embedding_api_url: str = Field(default="http://10.2.0.16:8085/v1/embeddings", description="Embedding API endpoint URL")
     embedding_model: str = Field(default="Qwen3-Embedding-8B", description="Embedding model name")
     embedding_api_timeout: int = Field(default=30, description="Embedding API timeout in seconds")
+    embedding_vector_size: int = Field(default=1024, description="Size of the embedding vectors")
     
     # JWT settings
     secret_key: str = Field(default="your-secret-key-change-in-production", description="JWT secret key")

@@ -1,8 +1,6 @@
 import asyncio
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
-from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, MatchValue
 from datetime import datetime
 
 from backend.core.config import get_settings
@@ -23,8 +21,8 @@ class VectorService:
     def __init__(self):
         self.settings = get_settings()
         
-        # Initialize Qdrant client
-        self.qdrant_client = QdrantClient(url=self.settings.qdrant_url, check_compatibility=False)
+        # Initialize Qdrant client (deferred)
+        self.qdrant_client: Optional[QdrantClient] = None
         
         # Initialize embedding service
         self.embedding_service = EmbeddingService()
@@ -47,6 +45,13 @@ class VectorService:
     async def _ensure_collection_exists(self):
         """Create the vector collection if it doesn't exist."""
         try:
+            # Check if collection exists
+            from qdrant_client import QdrantClient
+            from qdrant_client.models import Distance, VectorParams
+            
+            if self.qdrant_client is None:
+                self.qdrant_client = QdrantClient(url=self.settings.qdrant_url, check_compatibility=False)
+
             # Check if collection exists
             collections = self.qdrant_client.get_collections()
             collection_names = [col.name for col in collections.collections]
@@ -99,6 +104,7 @@ class VectorService:
                 # Generate embedding
                 embedding = await self.embedding_service.get_embedding(content)
                 
+                from qdrant_client.models import PointStruct
                 # Create point
                 point = PointStruct(
                     id=f"{document_id}_{i}",
@@ -159,6 +165,7 @@ class VectorService:
             # Generate query embedding
             query_embedding = await self.embedding_service.get_embedding(query_text)
             
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
             # Build filter
             filter_conditions = []
             if user_id is not None:
@@ -171,7 +178,7 @@ class VectorService:
             if document_id is not None:
                 filter_conditions.append(
                     FieldCondition(
-                        key="document_id", 
+                        key="document_id",
                         match=MatchValue(value=document_id)
                     )
                 )
@@ -262,10 +269,8 @@ class VectorService:
     
     async def close(self):
         """Close connections and cleanup resources."""
-        try:
-            await self.embedding_service.close()
-        except Exception:
-            pass  # Ignore cleanup errors
+        # EmbeddingService no longer has a close method as httpx.AsyncClient is managed by async with
+        pass
 
 # Create global instance
 vector_service = VectorService() 

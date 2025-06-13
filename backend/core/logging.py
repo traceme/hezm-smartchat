@@ -52,12 +52,11 @@ class SmartChatLogger:
         file_handler.setLevel(level)
         file_handler.setFormatter(detailed_formatter)
         
-        # Console handler for development
-        if self.settings.debug:
-            console_handler = logging.StreamHandler(sys.stdout)
-            console_handler.setLevel(logging.INFO)
-            console_handler.setFormatter(simple_formatter)
-            logger.addHandler(console_handler)
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(logging.DEBUG) # Set to DEBUG to capture all levels
+        console_handler.setFormatter(detailed_formatter) # Use detailed formatter for console
+        logger.addHandler(console_handler)
         
         logger.addHandler(file_handler)
         

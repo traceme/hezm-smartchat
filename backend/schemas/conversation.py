@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from models.conversation import MessageRole, AIModel
+from backend.models.conversation import MessageRole, AIModel
 
 # Base conversation schema
 class ConversationBase(BaseModel):

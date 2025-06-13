@@ -3,13 +3,16 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from backend.core.database import get_db
 from backend.services.search_cache import search_cache
-from services.embedding_service import embedding_service
+from services.embedding_service import EmbeddingService
 from services.hybrid_search import hybrid_search_engine
 from models.document import Document
 from schemas.search import SearchQuery, SearchResult, SearchResponse, HybridSearchQuery, HybridSearchResponse
 import asyncio
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+# Create a module-level instance of EmbeddingService
+embedding_service_instance = EmbeddingService()
 
 @router.post("/semantic", response_model=SearchResponse)
 async def semantic_search(
@@ -64,7 +67,7 @@ async def semantic_search(
             )
         
         # Cache miss - perform actual search
-        search_results = await embedding_service.search_similar_chunks(
+        search_results = await embedding_service_instance.search_similar_chunks(
             query_text=query.query,
             user_id=query.user_id,
             document_id=query.document_id,
@@ -113,7 +116,7 @@ async def semantic_search(
         
         # Cache the results for future requests
         search_metadata = {
-            "embedding_model": embedding_service.embedding_model,
+            "embedding_model": embedding_service_instance.settings.embedding_model,
             "score_threshold": query.score_threshold,
             "documents_searched": len(document_ids) if not query.document_id else 1,
             "cache_hit": False
@@ -169,7 +172,7 @@ async def get_document_chunks(
             raise HTTPException(status_code=404, detail="Document not found")
         
         # Get chunks info from Qdrant
-        chunks_info = await embedding_service.get_document_chunks_info(document_id)
+        chunks_info = await embedding_service_instance.get_document_chunks_info(document_id)
         
         if "error" in chunks_info:
             raise HTTPException(status_code=500, detail=chunks_info["error"])
@@ -212,7 +215,7 @@ async def get_collection_info():
     Useful for monitoring and debugging.
     """
     try:
-        collection_info = await embedding_service.get_collection_info()
+        collection_info = await embedding_service_instance.get_collection_info()
         return collection_info
         
     except Exception as e:
@@ -266,7 +269,7 @@ async def delete_document_vectors(
             raise HTTPException(status_code=404, detail="Document not found")
         
         # Delete vectors from Qdrant
-        success = await embedding_service.delete_document_chunks(document_id)
+        success = await embedding_service_instance.delete_document_chunks(document_id)
         
         if success:
             return {
@@ -295,7 +298,7 @@ async def find_similar_documents(
     """
     try:
         # Search for similar chunks
-        search_results = await embedding_service.search_similar_chunks(
+        search_results = await embedding_service_instance.search_similar_chunks(
             query_text=query,
             user_id=user_id,
             limit=limit * 3,  # Get more chunks to find diverse documents
@@ -454,7 +457,7 @@ async def compare_search_methods(
         start_time = time.time()
         
         # Vector search only
-        vector_results = await embedding_service.search_similar_chunks(
+        vector_results = await embedding_service_instance.search_similar_chunks(
             query_text=query,
             user_id=user_id,
             document_id=document_id,

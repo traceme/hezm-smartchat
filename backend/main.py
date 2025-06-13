@@ -34,6 +34,9 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
+# Import traceback for detailed error logging
+import traceback
+
 # Add logging and error handling middleware
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
@@ -47,28 +50,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from backend.core.database import engine, SessionLocal, Base, create_tables, drop_tables
+from backend.models.user import User
+from backend.models.document import Document
+from backend.schemas.document import DocumentType, DocumentStatus # Import DocumentType and DocumentStatus from schemas
+from backend.models.conversation import Conversation, Message, MessageRole, AIModel
+from backend.schemas.user import UserCreate
+from passlib.context import CryptContext
+from datetime import datetime
+import time
+from pathlib import Path
+
 def create_database_tables():
-    """Create database tables with proper model registration."""
-    import time
-    from pathlib import Path
-    from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime, Enum, ForeignKey
-    from sqlalchemy.ext.declarative import declarative_base  
-    from sqlalchemy.pool import StaticPool
-    from sqlalchemy.orm import sessionmaker, relationship
-    from backend.core.config import get_settings
-    from backend.models.document import DocumentType, DocumentStatus
-    from backend.models.conversation import MessageRole, AIModel
-    from datetime import datetime
-    import enum
+    """Create database tables and add dummy data for development."""
     
-    settings = get_settings()
-    
-    # Create fresh database  
-    # timestamp = int(time.time())
     backend_dir = Path(__file__).parent
-    # fresh_db_path = backend_dir / f"smartchat_{timestamp}.db"
     fresh_db_path = backend_dir / "smartchat_debug.db"
-    fresh_db_url = f"sqlite:///{fresh_db_path}"
     
     print(f"📂 Using database: {fresh_db_path}")
     
@@ -77,133 +74,114 @@ def create_database_tables():
         fresh_db_path.unlink()
         print("🗑️  Removed existing database file")
     
-    # Create engine
-    engine = create_engine(
-        fresh_db_url,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        pool_pre_ping=True,
-        echo=settings.debug,
-    )
-    
-    # Create fresh Base
-    Base = declarative_base()
-    
-    # Define models inline to avoid import conflicts
-    class User(Base):
-        __tablename__ = "users"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        username = Column(String(50), unique=True, index=True, nullable=False)
-        email = Column(String(100), unique=True, index=True, nullable=False)
-        hashed_password = Column(String(255), nullable=False)
-        is_active = Column(Boolean, default=True)
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    class Document(Base):
-        __tablename__ = "documents"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        title = Column(String(255), nullable=False, index=True)
-        original_filename = Column(String(255), nullable=False)
-        file_path = Column(String(500), nullable=False)
-        file_size = Column(Integer, nullable=False)
-        file_hash = Column(String(64), nullable=False, index=True)
-        mime_type = Column(String(100), nullable=False)
-        document_type = Column(Enum(DocumentType, native_enum=False), nullable=False)
-        status = Column(Enum(DocumentStatus, native_enum=False, default=DocumentStatus.UPLOADING), nullable=False, index=True)
-        
-        # Processing information
-        markdown_content = Column(Text, nullable=True)
-        processing_error = Column(Text, nullable=True)
-        processed_at = Column(DateTime, nullable=True)
-        
-        # Metadata
-        page_count = Column(Integer, nullable=True)
-        word_count = Column(Integer, nullable=True)
-        language = Column(String(10), nullable=True)
-        
-        # Timestamps
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-        
-        # Foreign keys
-        owner_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    
-    class DocumentChunk(Base):
-        __tablename__ = "document_chunks"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
-        chunk_index = Column(Integer, nullable=False)
-        content = Column(Text, nullable=False)
-        token_count = Column(Integer, nullable=False)
-        
-        # Page/location information
-        start_page = Column(Integer, nullable=True)
-        end_page = Column(Integer, nullable=True)
-        start_offset = Column(Integer, nullable=True)
-        end_offset = Column(Integer, nullable=True)
-        
-        # Vector information
-        vector_id = Column(String(100), nullable=True, index=True)
-        
-        # Timestamps
-        created_at = Column(DateTime, default=datetime.utcnow)
-    
-    class Conversation(Base):
-        __tablename__ = "conversations"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        title = Column(String(255), nullable=False, index=True)
-        
-        # Foreign keys
-        user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-        document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
-        
-        # Conversation settings
-        ai_model = Column(Enum(AIModel, native_enum=False), default=AIModel.GPT4O, nullable=False)
-        system_prompt = Column(Text, nullable=True)
-        
-        # Metadata
-        message_count = Column(Integer, default=0, nullable=False)
-        is_archived = Column(Boolean, default=False, nullable=False)
-        
-        # Timestamps
-        created_at = Column(DateTime, default=datetime.utcnow)
-        updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-        last_message_at = Column(DateTime, nullable=True)
-    
-    class Message(Base):
-        __tablename__ = "messages"
-        
-        id = Column(Integer, primary_key=True, index=True)
-        conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
-        
-        # Message content
-        role = Column(Enum(MessageRole, native_enum=False), nullable=False)
-        content = Column(Text, nullable=False)
-        
-        # AI response metadata
-        model_used = Column(String(100), nullable=True)
-        prompt_tokens = Column(Integer, nullable=True)
-        completion_tokens = Column(Integer, nullable=True)
-        total_tokens = Column(Integer, nullable=True)
-        
-        # Source information for RAG (JSON stored as text)
-        source_chunks = Column(Text, nullable=True)
-        retrieval_query = Column(Text, nullable=True)
-        retrieval_score = Column(String(20), nullable=True)
-        
-        # Response timing
-        response_time_ms = Column(Integer, nullable=True)
-        
-        # Timestamps
-        created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+    # Use the global engine and Base from backend.core.database
+    drop_tables() # Ensure all tables are dropped
+    create_tables() # Create all tables
+
+    # Add a default user and some dummy documents if the database is empty
+    db = SessionLocal()
+    try:
+        # Check if user exists
+        existing_user = db.query(User).filter(User.username == "testuser").first()
+        if not existing_user:
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+            # Create a dummy user
+            dummy_user_data = UserCreate(
+                username="testuser",
+                email="test@example.com",
+                password="testpassword",
+                full_name="Test User"
+            )
+            
+            hashed_password = pwd_context.hash(dummy_user_data.password)
+            user = User(
+                username=dummy_user_data.username,
+                email=dummy_user_data.email,
+                hashed_password=hashed_password,
+                full_name=dummy_user_data.full_name
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            print(f"👤 Created dummy user: {user.username}")
+        else:
+            user = existing_user
+            print(f"👤 Using existing user: {user.username}")
+
+        # Check if documents exist for this user
+        if db.query(Document).filter(Document.owner_id == user.id).count() == 0:
+            # Add some dummy documents
+            dummy_documents_data = [
+                {
+                    "title": "Sample Document 1",
+                    "original_filename": "sample_doc_1.pdf",
+                    "file_path": "/app/data/sample_doc_1.pdf",
+                    "file_size": 1024 * 500, # 500 KB
+                    "file_hash": "hash1",
+                    "mime_type": "application/pdf",
+                    "document_type": DocumentType.PDF,
+                    "status": DocumentStatus.READY,
+                    "category": "General",
+                    "page_count": 10,
+                    "word_count": 2500,
+                    "language": "en",
+                    "owner_id": user.id,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "processed_at": datetime.utcnow()
+                },
+                {
+                    "title": "Another Document Example",
+                    "original_filename": "another_doc.txt",
+                    "file_path": "/app/data/another_doc.txt",
+                    "file_size": 1024 * 100, # 100 KB
+                    "file_hash": "hash2",
+                    "mime_type": "text/plain",
+                    "document_type": DocumentType.TXT,
+                    "status": DocumentStatus.PROCESSING,
+                    "category": "Notes",
+                    "page_count": 2,
+                    "word_count": 500,
+                    "language": "en",
+                    "owner_id": user.id,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "processed_at": None
+                },
+                {
+                    "title": "Important Report",
+                    "original_filename": "report.docx",
+                    "file_path": "/app/data/report.docx",
+                    "file_size": 1024 * 1024 * 2, # 2 MB
+                    "file_hash": "hash3",
+                    "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "document_type": DocumentType.DOCX,
+                    "status": DocumentStatus.ERROR,
+                    "category": "Reports",
+                    "page_count": 50,
+                    "word_count": 15000,
+                    "language": "en",
+                    "owner_id": user.id,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                    "processed_at": None,
+                    "processing_error": "Failed to parse document content."
+                }
+            ]
+
+            for doc_data in dummy_documents_data:
+                document = Document(**doc_data)
+                db.add(document)
+            db.commit()
+            print(f"📚 Added {len(dummy_documents_data)} dummy documents for user {user.username}")
+        else:
+            print(f"📚 Documents already exist for user {user.username}, skipping dummy data creation.")
+    except Exception as e:
+        print(f"❌ Error adding dummy data: {e}")
+        db.rollback()
+    finally:
+        db.close()
     
     # Clean up old database files
     project_root = Path.cwd()
@@ -213,7 +191,7 @@ def create_database_tables():
     files_to_remove = old_db_files[3:]
     files_to_remove.extend([
         backend_dir / "smartchat.db",
-        project_root / "smartchat.db", 
+        project_root / "smartchat.db",
         Path("./smartchat.db")
     ])
     
@@ -229,10 +207,8 @@ def create_database_tables():
     if removed_files:
         print(f"🗑️  Cleaned up old database files: {', '.join(removed_files)}")
     
-    # Update global database configuration
-    import backend.core.database as db_module
-    db_module.engine = engine
-    db_module.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # The engine and SessionLocal are already globally configured in backend.core.database
+    # No need to re-assign them here.
     
     return engine
 
@@ -243,21 +219,71 @@ async def startup_event():
     print("🚀 Starting SmartChat application...")
     
     try:
-        # Initialize database
-        engine = create_database_tables()
-        
-        # Verify tables exist
+        # Initialize database based on DATABASE_URL
+        if settings.database_url.startswith("sqlite"):
+            engine = create_database_tables()
+            logger.info("✅ SQLite database tables created successfully (development mode)")
+            print("✅ SQLite database tables created successfully (development mode)")
+        else:
+            # For PostgreSQL, rely on Alembic migrations. Do not auto-create tables.
+            logger.info("ℹ️  Skipping automatic database table creation for PostgreSQL. Relying on Alembic migrations.")
+            print("ℹ️  Skipping automatic database table creation for PostgreSQL. Relying on Alembic migrations.")
+            from backend.core.database import engine # Ensure engine is imported for inspection
+            
+        # Verify tables exist (for both SQLite and PostgreSQL, after potential Alembic migration)
         from sqlalchemy import inspect
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        logger.info(f"📋 Created tables: {', '.join(tables)}")
-        print(f"📋 Created tables: {', '.join(tables)}")
+        logger.info(f"📋 Detected tables: {', '.join(tables)}")
+        print(f"📋 Detected tables: {', '.join(tables)}")
         
         if 'documents' not in tables:
-            raise Exception("Documents table not created!")
+            logger.warning("⚠️  'documents' table not found. Ensure Alembic migrations have been run for PostgreSQL.")
+            print("⚠️  'documents' table not found. Ensure Alembic migrations have been run for PostgreSQL.")
+            # Depending on strictness, you might want to raise an exception here for production
+            # raise Exception("Documents table not found!")
             
-        logger.info("✅ Database tables created successfully")
-        print("✅ Database tables created successfully")
+        logger.info("✅ Database initialization check complete.")
+        print("✅ Database initialization check complete.")
+
+        # For PostgreSQL, ensure a default user exists if the users table is empty
+        if not settings.database_url.startswith("sqlite"):
+            from backend.core.database import SessionLocal
+            from backend.models.user import User
+            from backend.schemas.user import UserCreate
+            from passlib.context import CryptContext
+            
+            db = SessionLocal()
+            try:
+                if db.query(User).count() == 0:
+                    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+                    dummy_user_data = UserCreate(
+                        username="testuser",
+                        email="test@example.com",
+                        password="testpassword",
+                        full_name="Test User"
+                    )
+                    hashed_password = pwd_context.hash(dummy_user_data.password)
+                    user = User(
+                        username=dummy_user_data.username,
+                        email=dummy_user_data.email,
+                        hashed_password=hashed_password,
+                        full_name=dummy_user_data.full_name
+                    )
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+                    logger.info(f"👤 Created default user: {user.username} (ID: {user.id}) for PostgreSQL development.")
+                    print(f"👤 Created default user: {user.username} (ID: {user.id}) for PostgreSQL development.")
+                else:
+                    logger.info("👤 Users table not empty, skipping default user creation.")
+                    print("👤 Users table not empty, skipping default user creation.")
+            except Exception as user_e:
+                logger.error(f"❌ Error creating default user: {user_e}")
+                print(f"❌ Error creating default user: {user_e}")
+                db.rollback()
+            finally:
+                db.close()
         
         # Initialize Redis
         redis_client = await init_redis()
@@ -269,6 +295,13 @@ async def startup_event():
             logger.warning("⚠️  Redis connection failed - caching disabled")
             print("⚠️  Redis connection failed - caching disabled")
         
+        # Ensure Qdrant collection exists
+        from backend.services.embedding_service import EmbeddingService
+        embedding_service_instance = EmbeddingService()
+        await embedding_service_instance._create_collection_if_not_exists()
+        logger.info("✅ Qdrant collection check complete.")
+        print("✅ Qdrant collection check complete.")
+
         # Log configuration
         logger.info(f"📊 Debug mode: {settings.debug}")
         logger.info(f"📂 Database: {settings.database_url}")
@@ -297,6 +330,9 @@ async def shutdown_event():
         await close_redis()
         logger.info("🗄️  Redis connection closed")
         print("🗄️  Redis connection closed")
+
+        # EmbeddingService HTTP client is now managed per-request via httpx.AsyncClient context manager.
+        # No explicit close needed here.
         
     except Exception as e:
         logger.error(f"❌ Shutdown error: {e}")

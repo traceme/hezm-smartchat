@@ -84,14 +84,17 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             # Get request ID if available
             request_id = getattr(request.state, 'request_id', None)
             
-            # Log the error with context
+            # Log the error with context and traceback
+            import traceback
+            full_traceback = traceback.format_exc()
             log_error(
                 error=exc,
                 context={
                     "method": request.method,
                     "path": str(request.url.path),
                     "query_params": str(request.query_params),
-                    "client_ip": request.client.host if request.client else None
+                    "client_ip": request.client.host if request.client else None,
+                    "traceback": full_traceback # Add traceback to context
                 },
                 request_id=request_id
             )
